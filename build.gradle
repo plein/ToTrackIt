@@ -1,0 +1,59 @@
+plugins {
+    id("com.github.johnrengelman.shadow") version "8.1.1"
+    id("io.micronaut.application") version "4.2.1"
+}
+
+version = "0.1"
+group = "com.totrackit"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Micronaut core
+    implementation("io.micronaut:micronaut-http-client")
+    implementation("io.micronaut:micronaut-http-server-netty")
+    implementation("io.micronaut:micronaut-jackson-databind")
+    implementation("io.micronaut.validation:micronaut-validation")
+    
+    // Database dependencies
+    implementation("io.micronaut.data:micronaut-data-jdbc")
+    implementation("io.micronaut.flyway:micronaut-flyway")
+    implementation("io.micronaut.sql:micronaut-jdbc-hikari")
+    runtimeOnly("org.postgresql:postgresql")
+    
+    // Logging
+    runtimeOnly("ch.qos.logback:logback-classic")
+    
+    // YAML support
+    runtimeOnly("org.yaml:snakeyaml")
+    
+    // Testing
+    testImplementation("io.micronaut:micronaut-http-client")
+    testImplementation("io.micronaut.test:micronaut-test-junit5")
+    testImplementation("org.junit.jupiter:junit-jupiter-api")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine")
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:postgresql")
+    testImplementation("org.testcontainers:testcontainers")
+    testRuntimeOnly("com.h2database:h2")
+}
+
+application {
+    mainClass.set("com.totrackit.Application")
+}
+
+java {
+    sourceCompatibility = JavaVersion.toVersion("21")
+    targetCompatibility = JavaVersion.toVersion("21")
+}
+
+micronaut {
+    runtime("netty")
+    testRuntime("junit5")
+    processing {
+        incremental(true)
+        annotations("com.totrackit.*")
+    }
+}

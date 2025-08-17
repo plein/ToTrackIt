@@ -1,0 +1,38 @@
+# Local development configuration (for running outside Docker)
+datasources:
+  default:
+    url: jdbc:postgresql://localhost:5432/totrackit
+    username: totrackit
+    password: totrackit
+    driver-class-name: org.postgresql.Driver
+    maximum-pool-size: 10
+    minimum-idle: 2
+
+flyway:
+  datasources:
+    default:
+      enabled: true
+      locations: classpath:db/migration
+      baseline-on-migrate: true
+      validate-on-migrate: true
+
+jpa:
+  default:
+    properties:
+      hibernate:
+        hbm2ddl:
+          auto: validate
+        show_sql: true
+        format_sql: true
+
+micronaut:
+  application:
+    name: totrackit
+  server:
+    port: 8080
+
+logger:
+  levels:
+    com.totrackit: DEBUG
+    io.micronaut: INFO
+    org.hibernate: INFO

@@ -1,0 +1,33 @@
+micronaut:
+  application:
+    name: totrackit-api
+  server:
+    port: 8080
+
+datasources:
+  default:
+    url: jdbc:postgresql://localhost:5432/totrackit
+    username: totrackit
+    password: totrackit
+    driver-class-name: org.postgresql.Driver
+    maximum-pool-size: 10
+
+flyway:
+  datasources:
+    default:
+      enabled: true
+      locations: classpath:db/migration
+
+jpa:
+  default:
+    properties:
+      hibernate:
+        hbm2ddl:
+          auto: validate
+        show_sql: false
+        format_sql: false
+
+logger:
+  levels:
+    com.totrackit: DEBUG
+    io.micronaut.data: DEBUG

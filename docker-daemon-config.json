@@ -1,0 +1,6 @@
+{
+  "registry-mirrors": [
+    "https://registry-1.docker.io"
+  ],
+  "dns": ["8.8.8.8", "8.8.4.4"]
+}

@@ -1,0 +1,37 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.iml
+
+# Build artifacts
+build/
+.gradle/
+gradle-wrapper.jar
+
+# Logs
+logs/
+*.log
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+README.md
+LICENSE
+*.md
+
+# Kiro
+.kiro/
+
+# Test resources
+.micronaut/test-resources/
+
+# OS
+.DS_Store
+Thumbs.db

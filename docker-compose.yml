@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: totrackit-postgres
+    environment:
+      POSTGRES_DB: totrackit
+      POSTGRES_USER: totrackit
+      POSTGRES_PASSWORD: totrackit
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U totrackit -d totrackit"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - totrackit-network
+
+  app:
+    build: .
+    container_name: totrackit-app
+    ports:
+      - "8080:8080"
+    environment:
+      DATASOURCES_DEFAULT_URL: jdbc:postgresql://postgres:5432/totrackit
+      DATASOURCES_DEFAULT_USERNAME: totrackit
+      DATASOURCES_DEFAULT_PASSWORD: totrackit
+      MICRONAUT_ENVIRONMENTS: docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - totrackit-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  totrackit-network:
+    driver: bridge

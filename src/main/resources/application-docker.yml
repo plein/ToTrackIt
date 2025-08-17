@@ -1,0 +1,39 @@
+# Docker environment configuration
+datasources:
+  default:
+    url: jdbc:postgresql://postgres:5432/totrackit
+    username: totrackit
+    password: totrackit
+    driver-class-name: org.postgresql.Driver
+    maximum-pool-size: 10
+    minimum-idle: 2
+
+flyway:
+  datasources:
+    default:
+      enabled: true
+      locations: classpath:db/migration
+      baseline-on-migrate: true
+      validate-on-migrate: true
+
+jpa:
+  default:
+    properties:
+      hibernate:
+        hbm2ddl:
+          auto: validate
+        show_sql: false
+        format_sql: false
+
+micronaut:
+  application:
+    name: totrackit
+  server:
+    port: 8080
+    host: 0.0.0.0
+
+logger:
+  levels:
+    com.totrackit: INFO
+    io.micronaut: INFO
+    org.hibernate: WARN
