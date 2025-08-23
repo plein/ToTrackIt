@@ -27,7 +27,7 @@
   - Add JSON serialization for tags and context fields
   - _Requirements: 1.2, 1.3, 2.2, 3.2_
 
-- [ ] 5. Implement repository layer
+- [x] 5. Implement repository layer
   - Create ProcessRepository interface extending CrudRepository
   - Write custom query methods for finding processes by name and ID
   - Implement filtering queries for status, deadline, and tag-based searches
