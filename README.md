@@ -79,6 +79,9 @@ docker run --name totrackit-postgres \
 The API will be available at:
 `http://localhost:8080/v1/`
 
+The Swagger UI will be available at:
+`http://localhost:8081/` (API documentation and testing)
+
 The UI will be available at:
 `http://localhost:3000/` (coming in Phase 2)
 
@@ -91,7 +94,7 @@ The UI will be available at:
 The project includes a complete Docker Compose setup for local development:
 
 ```bash
-# Start everything
+# Start everything (PostgreSQL + Application + Swagger UI)
 docker-compose up --build
 
 # Start only PostgreSQL (for local Java development)
@@ -106,6 +109,14 @@ docker-compose down
 # Clean reset (removes volumes)
 docker-compose down -v
 ```
+
+### Services Available
+
+When running `docker-compose up`, you'll have access to:
+
+- **API Server**: `http://localhost:8080/v1/` - Your ToTrackIt REST API
+- **Swagger UI**: `http://localhost:8081/` - Interactive API documentation and testing interface
+- **PostgreSQL**: `localhost:5432` - Database (accessible for local development)
 
 ### Environment Configuration
 
@@ -134,16 +145,26 @@ MICRONAUT_ENVIRONMENTS=local ./gradlew run
 
 ## 📖 API Overview
 
-ToTrackIt exposes a **REST API** (OpenAPI 3.1). Full spec: [`swagger.yaml`](./api.yaml).
+ToTrackIt exposes a **REST API** (OpenAPI 3.1). Full spec: [`api.yaml`](./api.yaml).
 
-Some key endpoints:
+### Interactive API Documentation
+
+The easiest way to explore and test the API is through the **Swagger UI**:
+
+1. Start the services: `docker-compose up`
+2. Open `http://localhost:8081/` in your browser
+3. Browse all endpoints with detailed documentation
+4. Test API calls directly from the interface
+5. Use the "Authorize" button to add your API keys
+
+### Key Endpoints
 
 * `POST /processes/{name}` → Start a process
 * `POST /processes/{name}/{id}/complete` → Mark process as completed
 * `GET /processes/metrics` → Get metrics & deadline breaches
 * `POST /notifications` → Configure alerts
 
-Example (register process):
+### Example (register process):
 
 ```bash
 curl -X POST "http://localhost:8080/v1/processes/dataImport" \
@@ -156,6 +177,110 @@ curl -X POST "http://localhost:8080/v1/processes/dataImport" \
         "context": { "customerId": "C1234" }
       }'
 ```
+
+**Tip**: Instead of using curl, try the same request in Swagger UI at `http://localhost:8081/` for a better development experience!
+
+---
+
+## �️ Dautabase
+
+### Schema Overview
+
+ToTrackIt uses **PostgreSQL** with **Flyway** for database migrations. The database schema is designed for high performance with proper indexing for common query patterns.
+
+### Core Tables
+
+#### `processes` Table
+The main table storing all process tracking data:
+
+```sql
+-- Key columns:
+id              BIGSERIAL PRIMARY KEY
+process_id      VARCHAR(50)           -- User-defined process identifier
+name            VARCHAR(100)          -- Process name (e.g., "dataImport")
+status          VARCHAR(20)           -- ACTIVE, COMPLETED, FAILED
+started_at      TIMESTAMP WITH TIME ZONE
+completed_at    TIMESTAMP WITH TIME ZONE
+deadline        TIMESTAMP WITH TIME ZONE
+tags            JSONB                 -- Flexible tagging system
+context         JSONB                 -- Custom metadata
+```
+
+### Database Access
+
+#### Connect to PostgreSQL
+
+```bash
+# Using Docker Compose
+docker-compose exec postgres psql -U totrackit -d totrackit
+
+# Or connect directly
+psql -h localhost -p 5432 -U totrackit -d totrackit
+```
+
+#### Useful Queries
+
+```sql
+-- View all active processes
+SELECT name, process_id, started_at, deadline 
+FROM processes 
+WHERE status = 'ACTIVE' 
+ORDER BY started_at DESC;
+
+-- Check processes approaching deadlines (next 24 hours)
+SELECT name, process_id, deadline, 
+       EXTRACT(EPOCH FROM (deadline - NOW()))/3600 as hours_remaining
+FROM processes 
+WHERE status = 'ACTIVE' 
+  AND deadline IS NOT NULL 
+  AND deadline < NOW() + INTERVAL '24 hours'
+ORDER BY deadline;
+
+-- Process completion metrics
+SELECT 
+    name,
+    COUNT(*) as total_processes,
+    AVG(EXTRACT(EPOCH FROM (completed_at - started_at))) as avg_duration_seconds,
+    COUNT(*) FILTER (WHERE completed_at > deadline) as missed_deadlines
+FROM processes 
+WHERE status = 'COMPLETED' 
+GROUP BY name;
+
+-- Query by tags (using JSONB operators)
+SELECT * FROM processes 
+WHERE tags @> '{"environment": "production"}';
+
+-- Query by context
+SELECT * FROM processes 
+WHERE context @> '{"priority": "high"}';
+```
+
+### Flyway Migrations
+
+Database schema is managed through Flyway migrations in `src/main/resources/db/migration/`:
+
+- **V1__Initial_baseline.sql**: Baseline migration
+- **V2__Create_processes_table.sql**: Core processes table with constraints and triggers
+- **V3__Add_indexes.sql**: Performance indexes for common queries
+
+#### Migration Commands
+
+```bash
+# Migrations run automatically on application startup
+# To check migration status:
+docker-compose exec app ./gradlew flywayInfo
+
+# To manually run migrations (if needed):
+docker-compose exec app ./gradlew flywayMigrate
+```
+
+### Performance Features
+
+- **Unique constraint**: Prevents duplicate active processes (same name + process_id)
+- **Automatic timestamps**: `updated_at` automatically maintained via triggers
+- **JSONB indexes**: GIN indexes on `tags` and `context` for fast JSON queries
+- **Composite indexes**: Optimized for common filtering patterns
+- **Partial indexes**: Efficient indexing for status-specific queries
 
 ---
 

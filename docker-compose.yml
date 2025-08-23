@@ -38,6 +38,17 @@ services:
     networks:
       - totrackit-network
 
+  swagger-ui:
+    image: nginx:alpine
+    container_name: totrackit-swagger-ui
+    ports:
+      - "8081:80"
+    volumes:
+      - ./swagger-ui.html:/usr/share/nginx/html/index.html:ro
+      - ./api.yaml:/usr/share/nginx/html/api.yaml:ro
+    networks:
+      - totrackit-network
+
 volumes:
   postgres_data:
     driver: local
