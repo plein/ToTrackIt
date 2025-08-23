@@ -17,6 +17,8 @@ flyway:
     default:
       enabled: true
       locations: classpath:db/migration
+      baseline-on-migrate: true
+      baseline-version: 0
 
 jpa:
   default:
