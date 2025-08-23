@@ -28,3 +28,7 @@ ToTrackIt is an open-source SaaS platform designed to track, monitor, and analyz
 - **Phase 1**: Kubernetes-ready service with Postgres
 - **Phase 2**: Web UI and metrics dashboard
 - **Phase 3**: Platform features (namespaces, notifications, OAuth2)
+
+## OpenSource mantra
+- Always keep documentation up to date and clean, specially README.
+- Document Interfaces and public methods/classes with javadocs.

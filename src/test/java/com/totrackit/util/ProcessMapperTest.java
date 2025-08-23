@@ -1,0 +1,67 @@
+package com.totrackit.util;
+
+import com.totrackit.dto.ProcessResponse;
+import com.totrackit.entity.ProcessEntity;
+import com.totrackit.model.DeadlineStatus;
+import com.totrackit.model.ProcessStatus;
+import com.totrackit.model.ProcessTag;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class ProcessMapperTest {
+
+    private final ProcessMapper mapper = new ProcessMapper();
+
+    @Test
+    void testToResponse() {
+        ProcessEntity entity = new ProcessEntity("test-id", "test-process");
+        entity.setStatus(ProcessStatus.ACTIVE);
+        entity.setStartedAt(Instant.ofEpochSecond(1640995200L)); // 2022-01-01 00:00:00 UTC
+        entity.setDeadline(Instant.ofEpochSecond(1640998800L)); // 2022-01-01 01:00:00 UTC
+        entity.setTagsList(List.of(new ProcessTag("env", "prod")));
+        entity.setContextMap(Map.of("user_id", "123"));
+
+        ProcessResponse response = mapper.toResponse(entity);
+
+        assertNotNull(response);
+        assertEquals("test-id", response.getId());
+        assertEquals("test-process", response.getName());
+        assertEquals(ProcessStatus.ACTIVE, response.getStatus());
+        assertEquals(1640995200L, response.getStartedAt());
+        assertEquals(1640998800L, response.getDeadline());
+        assertNotNull(response.getDuration());
+        assertEquals(1, response.getTags().size());
+        assertEquals("env", response.getTags().get(0).getKey());
+        assertEquals(1, response.getContext().size());
+        assertEquals("123", response.getContext().get("user_id"));
+    }
+
+    @Test
+    void testToResponseWithNullEntity() {
+        ProcessResponse response = mapper.toResponse(null);
+        assertNull(response);
+    }
+
+    @Test
+    void testToResponseWithCompletedProcess() {
+        ProcessEntity entity = new ProcessEntity("completed-id", "completed-process");
+        entity.setStatus(ProcessStatus.COMPLETED);
+        entity.setStartedAt(Instant.ofEpochSecond(1640995200L));
+        entity.setCompletedAt(Instant.ofEpochSecond(1640998800L));
+        entity.setDeadline(Instant.ofEpochSecond(1641002400L)); // Deadline after completion
+
+        ProcessResponse response = mapper.toResponse(entity);
+
+        assertNotNull(response);
+        assertEquals(ProcessStatus.COMPLETED, response.getStatus());
+        assertEquals(1640995200L, response.getStartedAt());
+        assertEquals(1640998800L, response.getCompletedAt());
+        assertEquals(DeadlineStatus.COMPLETED_ON_TIME, response.getDeadlineStatus());
+        assertEquals(3600L, response.getDuration()); // 1 hour
+    }
+}

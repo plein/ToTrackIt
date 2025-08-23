@@ -20,7 +20,7 @@
   - Test migrations run successfully on application startup
   - _Requirements: 1.1, 1.3, 2.2, 3.2_
 
-- [ ] 4. Create core data models and entities
+- [x] 4. Create core data models and entities
   - Implement ProcessEntity with JPA annotations and database mappings
   - Create ProcessStatus and DeadlineStatus enums
   - Write ProcessTag and request/response DTOs
