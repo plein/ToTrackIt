@@ -62,7 +62,7 @@
   - Return complete process details with proper JSON formatting
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 6.4_
 
-- [ ] 10. Create process listing endpoint
+- [x] 10. Create process listing endpoint
   - Implement GET /processes controller with filtering support
   - Add query parameter handling for status, deadline, and tag filters
   - Implement pagination with limit and offset parameters

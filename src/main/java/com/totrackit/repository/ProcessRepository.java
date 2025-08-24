@@ -3,6 +3,7 @@ package com.totrackit.repository;
 import com.totrackit.entity.ProcessEntity;
 import com.totrackit.model.DeadlineStatus;
 import com.totrackit.model.ProcessStatus;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.annotation.Query;
 import io.micronaut.data.annotation.Repository;
 import io.micronaut.data.jdbc.annotation.JdbcRepository;
@@ -53,7 +54,42 @@ public interface ProcessRepository extends CrudRepository<ProcessEntity, Long> {
     @Query("SELECT * FROM processes WHERE " +
            "(:status IS NULL OR status = :status) " +
            "ORDER BY started_at DESC LIMIT :limit OFFSET :offset")
-    List<ProcessEntity> findWithFilters(ProcessStatus status, int limit, int offset);
+    List<ProcessEntity> findWithFilters(@Nullable ProcessStatus status, int limit, int offset);
+    
+    /**
+     * Finds processes with comprehensive filtering support.
+     * Results are ordered by started_at descending (newest first).
+     * Note: Deadline status filtering is handled in the service layer for database compatibility.
+     * 
+     * @param name optional process name filter
+     * @param processId optional process ID filter
+     * @param status optional process status filter
+     * @param limit maximum number of results
+     * @param offset number of results to skip
+     * @return list of matching processes
+     */
+    @Query("SELECT * FROM processes WHERE " +
+           "(:name IS NULL OR name = :name) AND " +
+           "(:processId IS NULL OR process_id = :processId) AND " +
+           "(:status IS NULL OR status = :status) " +
+           "ORDER BY started_at DESC LIMIT :limit OFFSET :offset")
+    List<ProcessEntity> findWithComprehensiveFilters(@Nullable String name, @Nullable String processId, 
+                                                     @Nullable ProcessStatus status, int limit, int offset);
+    
+    /**
+     * Counts processes with comprehensive filtering support.
+     * 
+     * @param name optional process name filter
+     * @param processId optional process ID filter
+     * @param status optional process status filter
+     * @return count of matching processes
+     */
+    @Query("SELECT COUNT(*) FROM processes WHERE " +
+           "(:name IS NULL OR name = :name) AND " +
+           "(:processId IS NULL OR process_id = :processId) AND " +
+           "(:status IS NULL OR status = :status)")
+    long countWithComprehensiveFilters(@Nullable String name, @Nullable String processId, 
+                                      @Nullable ProcessStatus status);
     
     /**
      * Finds processes by name with optional status filtering.
@@ -131,7 +167,8 @@ public interface ProcessRepository extends CrudRepository<ProcessEntity, Long> {
      * @param status the process status
      * @return count of processes with the specified status
      */
-    long countByStatus(ProcessStatus status);
+    @Query("SELECT COUNT(*) FROM processes WHERE (:status IS NULL OR status = :status)")
+    long countByStatus(@Nullable ProcessStatus status);
     
     /**
      * Counts total processes.

@@ -170,40 +170,50 @@ public class ProcessService {
             pageable = new Pageable();
         }
         
-        List<ProcessEntity> entities;
-        
-        // Apply filtering logic based on the most specific criteria first
-        if (filter.getDeadlineStatus() == DeadlineStatus.MISSED) {
-            // Special case for overdue processes - these need real-time calculation
-            entities = processRepository.findOverdueProcesses(Instant.now());
-            entities = applyAdditionalFiltering(entities, filter);
-            entities = applySorting(entities, filter);
-            entities = applyPagination(entities, pageable);
-        } else if (filter.getTags() != null && !filter.getTags().isEmpty()) {
-            // Tag-based filtering (simplified for database compatibility)
-            entities = applyTagFiltering(filter, pageable);
-        } else {
-            // Standard filtering using database queries
-            entities = processRepository.findWithFilters(
+        try {
+            // Get all matching records from database (without pagination for now)
+            // We'll apply pagination after additional filtering and sorting
+            List<ProcessEntity> entities = processRepository.findWithComprehensiveFilters(
+                    filter.getName(),
+                    filter.getId(),
                     filter.getStatus(),
-                    pageable.getLimit(),
-                    pageable.getOffset()
+                    Integer.MAX_VALUE, // Get all records
+                    0 // No offset
             );
-            // Apply additional filtering in memory for complex criteria
+            
+            LOG.debug("Retrieved {} entities from repository", entities.size());
+            
+            // Apply additional filtering that can't be done at database level
             entities = applyAdditionalFiltering(entities, filter);
+            
+            LOG.debug("After additional filtering: {} entities", entities.size());
+            
+            // Calculate total count before pagination
+            long total = entities.size();
+            
+            // Apply sorting
+            entities = applySorting(entities, filter);
+            
+            // Apply pagination after filtering and sorting
+            entities = applyPagination(entities, pageable);
+            
+            // Convert to responses
+            List<ProcessResponse> responses = entities.stream()
+                    .map(processMapper::toResponse)
+                    .collect(Collectors.toList());
+            
+            LOG.debug("Final result: {} responses out of {} total", responses.size(), total);
+            
+            PagedResult<ProcessResponse> result = new PagedResult<>(responses, total, pageable.getLimit(), pageable.getOffset());
+            
+            LOG.debug("Returning result: {}", result);
+            
+            return result;
+            
+        } catch (Exception e) {
+            LOG.error("Error listing processes", e);
+            throw e;
         }
-        
-        // Convert to responses
-        List<ProcessResponse> responses = entities.stream()
-                .map(processMapper::toResponse)
-                .collect(Collectors.toList());
-        
-        // Calculate total count (simplified approach)
-        long total = calculateTotalCount(filter);
-        
-        LOG.debug("Found {} processes (total: {})", responses.size(), total);
-        
-        return new PagedResult<>(responses, total, pageable.getLimit(), pageable.getOffset());
     }
     
     /**

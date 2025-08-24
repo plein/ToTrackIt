@@ -12,6 +12,8 @@ import java.util.Map;
 @Introspected
 public class ProcessFilter {
     
+    private String name;
+    private String id;
     private ProcessStatus status;
     private DeadlineStatus deadlineStatus;
     private Map<String, String> tags;
@@ -25,6 +27,22 @@ public class ProcessFilter {
     public ProcessFilter() {}
     
     // Getters and setters
+    public String getName() {
+        return name;
+    }
+    
+    public void setName(String name) {
+        this.name = name;
+    }
+    
+    public String getId() {
+        return id;
+    }
+    
+    public void setId(String id) {
+        this.id = id;
+    }
+    
     public ProcessStatus getStatus() {
         return status;
     }
@@ -92,7 +110,9 @@ public class ProcessFilter {
     @Override
     public String toString() {
         return "ProcessFilter{" +
-                "status=" + status +
+                "name='" + name + '\'' +
+                ", id='" + id + '\'' +
+                ", status=" + status +
                 ", deadlineStatus=" + deadlineStatus +
                 ", tags=" + tags +
                 ", deadlineBefore=" + deadlineBefore +
