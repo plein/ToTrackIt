@@ -64,3 +64,4 @@ docker-compose up -d
 - Maintain OpenAPI specification accuracy
 - Implement proper error handling and validation
 - Include comprehensive logging for debugging
+- Use optimistic locking, avoid transactions when possible
