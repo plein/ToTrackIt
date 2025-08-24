@@ -978,11 +978,11 @@ paths:
                 status:
                   type: string
                   enum: 
-                    - successful
-                    - failed
+                    - COMPLETED
+                    - FAILED
                   description: The outcome of the process.
-                  default: successful
-                  examples: ["successful"]
+                  default: COMPLETED
+                  examples: ["COMPLETED"]
       responses:
         default:
           $ref: '#/components/responses/DefaultError'

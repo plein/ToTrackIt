@@ -5,7 +5,6 @@ import com.totrackit.model.ProcessStatus;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.serde.annotation.Serdeable;
 
-import jakarta.validation.constraints.NotNull;
 
 /**
  * Request DTO for completing a process.
@@ -14,12 +13,13 @@ import jakarta.validation.constraints.NotNull;
 @Serdeable
 public class CompleteProcessRequest {
     
-    @NotNull(message = "Status is required")
     @JsonProperty("status")
     private ProcessStatus status;
     
     // Default constructor
-    public CompleteProcessRequest() {}
+    public CompleteProcessRequest() {
+        status = ProcessStatus.COMPLETED;
+    }
     
     // Constructor with required fields
     public CompleteProcessRequest(ProcessStatus status) {

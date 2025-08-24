@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Singleton
-@Requires(classes = {ProcessAlreadyExistsException.class, ProcessNotFoundException.class})
 public class GlobalExceptionHandler {
     
     private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);

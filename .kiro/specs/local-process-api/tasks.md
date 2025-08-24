@@ -48,7 +48,7 @@
   - Return proper HTTP status codes and response format
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 6.1, 6.2_
 
-- [ ] 8. Implement process completion endpoint
+- [x] 8. Implement process completion endpoint
   - Create PUT /processes/{name}/{id}/complete controller method
   - Add validation for process existence and completion status
   - Calculate and store completion timestamp and duration

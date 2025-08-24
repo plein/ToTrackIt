@@ -559,31 +559,11 @@ public class ProcessService {
      * Validates process completion parameters.
      */
     private void validateCompleteRequest(String name, String processId, ProcessStatus status) {
-        if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("Process name cannot be null or empty");
-        }
-        
-        if (name.length() > 100) {
-            throw new IllegalArgumentException("Process name cannot exceed 100 characters");
-        }
-        
-        if (processId == null || processId.trim().isEmpty()) {
-            throw new IllegalArgumentException("Process ID cannot be null or empty");
-        }
-        
-        if (processId.length() > 50) {
-            throw new IllegalArgumentException("Process ID cannot exceed 50 characters");
-        }
-        
-        if (status == null) {
-            throw new IllegalArgumentException("Completion status cannot be null");
-        }
-        
         if (status == ProcessStatus.ACTIVE) {
             throw new IllegalArgumentException("Cannot complete process with ACTIVE status");
         }
     }
-    
+
     /**
      * Validates process retrieval parameters.
      */

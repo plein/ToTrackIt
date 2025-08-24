@@ -1,8 +1,12 @@
 package com.totrackit.controller;
 
+import com.totrackit.dto.CompleteProcessRequest;
 import com.totrackit.dto.NewProcessRequest;
 import com.totrackit.dto.ProcessResponse;
+import com.totrackit.exception.ProcessAlreadyCompletedException;
 import com.totrackit.exception.ProcessAlreadyExistsException;
+import com.totrackit.exception.ProcessNotFoundException;
+import com.totrackit.model.ProcessStatus;
 import com.totrackit.service.ProcessService;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -116,5 +120,159 @@ public class ProcessControllerTest {
         });
         
         assertEquals("Service error", exception.getMessage());
+    }
+    
+    @Test
+    public void testCompleteProcess_Success() {
+        // Given
+        String processName = "test-process";
+        String processId = "test-id-001";
+        CompleteProcessRequest request = new CompleteProcessRequest(ProcessStatus.COMPLETED);
+        
+        ProcessResponse expectedResponse = new ProcessResponse();
+        expectedResponse.setId(processId);
+        expectedResponse.setName(processName);
+        expectedResponse.setStatus(ProcessStatus.COMPLETED);
+        expectedResponse.setStartedAt(System.currentTimeMillis() / 1000 - 3600); // Started 1 hour ago
+        expectedResponse.setCompletedAt(System.currentTimeMillis() / 1000); // Completed now
+        expectedResponse.setDuration(3600L); // 1 hour duration
+        
+        when(processService.completeProcess(eq(processName), eq(processId), eq(ProcessStatus.COMPLETED)))
+                .thenReturn(expectedResponse);
+        
+        // When
+        HttpResponse<ProcessResponse> response = processController.completeProcess(processName, processId, request);
+        
+        // Then
+        assertEquals(HttpStatus.OK, response.getStatus());
+        assertNotNull(response.body());
+        
+        ProcessResponse processResponse = response.body();
+        assertEquals(processId, processResponse.getId());
+        assertEquals(processName, processResponse.getName());
+        assertEquals(ProcessStatus.COMPLETED, processResponse.getStatus());
+        assertNotNull(processResponse.getCompletedAt());
+        assertNotNull(processResponse.getDuration());
+    }
+    
+    @Test
+    public void testCompleteProcess_WithFailedStatus() {
+        // Given
+        String processName = "failed-process";
+        String processId = "failed-id";
+        CompleteProcessRequest request = new CompleteProcessRequest(ProcessStatus.FAILED);
+        
+        ProcessResponse expectedResponse = new ProcessResponse();
+        expectedResponse.setId(processId);
+        expectedResponse.setName(processName);
+        expectedResponse.setStatus(ProcessStatus.FAILED);
+        expectedResponse.setStartedAt(System.currentTimeMillis() / 1000 - 1800); // Started 30 minutes ago
+        expectedResponse.setCompletedAt(System.currentTimeMillis() / 1000); // Completed now
+        expectedResponse.setDuration(1800L); // 30 minutes duration
+        
+        when(processService.completeProcess(eq(processName), eq(processId), eq(ProcessStatus.FAILED)))
+                .thenReturn(expectedResponse);
+        
+        // When
+        HttpResponse<ProcessResponse> response = processController.completeProcess(processName, processId, request);
+        
+        // Then
+        assertEquals(HttpStatus.OK, response.getStatus());
+        assertNotNull(response.body());
+        
+        ProcessResponse processResponse = response.body();
+        assertEquals(processId, processResponse.getId());
+        assertEquals(processName, processResponse.getName());
+        assertEquals(ProcessStatus.FAILED, processResponse.getStatus());
+        assertNotNull(processResponse.getCompletedAt());
+        assertNotNull(processResponse.getDuration());
+    }
+    
+    @Test
+    public void testCompleteProcess_ProcessNotFound() {
+        // Given
+        String processName = "nonexistent-process";
+        String processId = "nonexistent-id";
+        CompleteProcessRequest request = new CompleteProcessRequest(ProcessStatus.COMPLETED);
+        
+        when(processService.completeProcess(eq(processName), eq(processId), eq(ProcessStatus.COMPLETED)))
+                .thenThrow(new ProcessNotFoundException(processName, processId));
+        
+        // When & Then
+        ProcessNotFoundException exception = assertThrows(ProcessNotFoundException.class, () -> {
+            processController.completeProcess(processName, processId, request);
+        });
+        
+        assertTrue(exception.getMessage().contains("nonexistent-process"));
+        assertTrue(exception.getMessage().contains("nonexistent-id"));
+    }
+    
+    @Test
+    public void testCompleteProcess_AlreadyCompleted() {
+        // Given
+        String processName = "completed-process";
+        String processId = "completed-id";
+        CompleteProcessRequest request = new CompleteProcessRequest(ProcessStatus.COMPLETED);
+        
+        when(processService.completeProcess(eq(processName), eq(processId), eq(ProcessStatus.COMPLETED)))
+                .thenThrow(new ProcessAlreadyCompletedException(processName, processId));
+        
+        // When & Then
+        ProcessAlreadyCompletedException exception = assertThrows(ProcessAlreadyCompletedException.class, () -> {
+            processController.completeProcess(processName, processId, request);
+        });
+        
+        assertTrue(exception.getMessage().contains("completed-process"));
+        assertTrue(exception.getMessage().contains("completed-id"));
+    }
+    
+    @Test
+    public void testCompleteProcess_ServiceException() {
+        // Given
+        String processName = "error-process";
+        String processId = "error-id";
+        CompleteProcessRequest request = new CompleteProcessRequest(ProcessStatus.COMPLETED);
+        
+        when(processService.completeProcess(eq(processName), eq(processId), eq(ProcessStatus.COMPLETED)))
+                .thenThrow(new RuntimeException("Service error"));
+        
+        // When & Then
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            processController.completeProcess(processName, processId, request);
+        });
+        
+        assertEquals("Service error", exception.getMessage());
+    }
+    
+    @Test
+    public void testCompleteProcess_NoBodyDefaultsToCompleted() {
+        // Given
+        String processName = "test-process";
+        String processId = "test-id-001";
+        
+        ProcessResponse expectedResponse = new ProcessResponse();
+        expectedResponse.setId(processId);
+        expectedResponse.setName(processName);
+        expectedResponse.setStatus(ProcessStatus.COMPLETED);
+        expectedResponse.setStartedAt(System.currentTimeMillis() / 1000 - 3600); // Started 1 hour ago
+        expectedResponse.setCompletedAt(System.currentTimeMillis() / 1000); // Completed now
+        expectedResponse.setDuration(3600L); // 1 hour duration
+        
+        when(processService.completeProcess(eq(processName), eq(processId), eq(ProcessStatus.COMPLETED)))
+                .thenReturn(expectedResponse);
+        
+        // When - passing null as request body
+        HttpResponse<ProcessResponse> response = processController.completeProcess(processName, processId, null);
+        
+        // Then
+        assertEquals(HttpStatus.OK, response.getStatus());
+        assertNotNull(response.body());
+        
+        ProcessResponse processResponse = response.body();
+        assertEquals(processId, processResponse.getId());
+        assertEquals(processName, processResponse.getName());
+        assertEquals(ProcessStatus.COMPLETED, processResponse.getStatus());
+        assertNotNull(processResponse.getCompletedAt());
+        assertNotNull(processResponse.getDuration());
     }
 }
