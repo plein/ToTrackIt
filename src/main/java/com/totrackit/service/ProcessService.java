@@ -1,5 +1,8 @@
 package com.totrackit.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.totrackit.dto.*;
 import com.totrackit.entity.ProcessEntity;
 import com.totrackit.exception.ProcessAlreadyCompletedException;
@@ -7,6 +10,7 @@ import com.totrackit.exception.ProcessAlreadyExistsException;
 import com.totrackit.exception.ProcessNotFoundException;
 import com.totrackit.model.DeadlineStatus;
 import com.totrackit.model.ProcessStatus;
+import com.totrackit.model.ProcessTag;
 import com.totrackit.repository.ProcessRepository;
 import com.totrackit.util.ProcessMapper;
 import io.micronaut.transaction.annotation.Transactional;
@@ -51,6 +55,9 @@ public class ProcessService {
     public ProcessResponse createProcess(String name, NewProcessRequest request) {
         LOG.debug("Creating process: name='{}', id='{}'", name, request.getId());
         
+        // Validate input parameters
+        validateCreateRequest(name, request);
+        
         // Validate that no active process exists with the same name and ID
         if (processRepository.existsActiveProcess(name, request.getId())) {
             throw new ProcessAlreadyExistsException(name, request.getId());
@@ -65,11 +72,11 @@ public class ProcessService {
         }
         
         if (request.getTags() != null && !request.getTags().isEmpty()) {
-            entity.setTagsList(request.getTags());
+            entity.setTags(convertTagsToJson(request.getTags()));
         }
         
         if (request.getContext() != null && !request.getContext().isEmpty()) {
-            entity.setContextMap(request.getContext());
+            entity.setContext(convertContextToJson(request.getContext()));
         }
         
         // Save to database
@@ -90,6 +97,9 @@ public class ProcessService {
      */
     public ProcessResponse getProcess(String name, String processId) {
         LOG.debug("Retrieving process: name='{}', id='{}'", name, processId);
+        
+        // Validate input parameters
+        validateGetRequest(name, processId);
         
         ProcessEntity entity = processRepository.findByNameAndProcessId(name, processId)
                 .orElseThrow(() -> new ProcessNotFoundException(name, processId));
@@ -112,6 +122,9 @@ public class ProcessService {
     public ProcessResponse completeProcess(String name, String processId, ProcessStatus status) {
         LOG.debug("Completing process: name='{}', id='{}', status={}", name, processId, status);
         
+        // Validate input parameters
+        validateCompleteRequest(name, processId, status);
+        
         ProcessEntity entity = processRepository.findByNameAndProcessId(name, processId)
                 .orElseThrow(() -> new ProcessNotFoundException(name, processId));
         
@@ -127,7 +140,7 @@ public class ProcessService {
         ProcessEntity savedEntity = processRepository.update(entity);
         
         LOG.info("Completed process: name='{}', id='{}', status={}, duration={}s", 
-                name, processId, status, savedEntity.getDuration());
+                name, processId, status, calculateDuration(savedEntity));
         
         return processMapper.toResponse(savedEntity);
     }
@@ -143,27 +156,36 @@ public class ProcessService {
     public PagedResult<ProcessResponse> listProcesses(ProcessFilter filter, Pageable pageable) {
         LOG.debug("Listing processes with filter: {}, pageable: {}", filter, pageable);
         
+        // Validate input parameters
+        if (filter == null) {
+            filter = new ProcessFilter();
+        }
+        if (pageable == null) {
+            pageable = new Pageable();
+        }
+        
         List<ProcessEntity> entities;
         
-        // Apply filtering logic
+        // Apply filtering logic based on the most specific criteria first
         if (filter.getDeadlineStatus() == DeadlineStatus.MISSED) {
-            // Special case for overdue processes
+            // Special case for overdue processes - these need real-time calculation
             entities = processRepository.findOverdueProcesses(Instant.now());
+            entities = applyAdditionalFiltering(entities, filter);
+            entities = applySorting(entities, filter);
             entities = applyPagination(entities, pageable);
         } else if (filter.getTags() != null && !filter.getTags().isEmpty()) {
             // Tag-based filtering (simplified for database compatibility)
             entities = applyTagFiltering(filter, pageable);
         } else {
-            // Standard filtering
+            // Standard filtering using database queries
             entities = processRepository.findWithFilters(
                     filter.getStatus(),
                     pageable.getLimit(),
                     pageable.getOffset()
             );
+            // Apply additional filtering in memory for complex criteria
+            entities = applyAdditionalFiltering(entities, filter);
         }
-        
-        // Apply additional filtering in memory for complex criteria
-        entities = applyAdditionalFiltering(entities, filter);
         
         // Convert to responses
         List<ProcessResponse> responses = entities.stream()
@@ -197,6 +219,77 @@ public class ProcessService {
     }
     
     /**
+     * Applies sorting to a list of entities based on filter criteria.
+     */
+    private List<ProcessEntity> applySorting(List<ProcessEntity> entities, ProcessFilter filter) {
+        if (entities.isEmpty()) {
+            return entities;
+        }
+        
+        String sortBy = filter.getSortBy() != null ? filter.getSortBy() : "started_at";
+        String sortDirection = filter.getSortDirection() != null ? filter.getSortDirection() : "desc";
+        boolean ascending = "asc".equalsIgnoreCase(sortDirection);
+        
+        return entities.stream()
+                .sorted((e1, e2) -> {
+                    int comparison = 0;
+                    
+                    switch (sortBy.toLowerCase()) {
+                        case "started_at":
+                            comparison = e1.getStartedAt().compareTo(e2.getStartedAt());
+                            break;
+                        case "completed_at":
+                            if (e1.getCompletedAt() == null && e2.getCompletedAt() == null) {
+                                comparison = 0;
+                            } else if (e1.getCompletedAt() == null) {
+                                comparison = 1; // null values last
+                            } else if (e2.getCompletedAt() == null) {
+                                comparison = -1; // null values last
+                            } else {
+                                comparison = e1.getCompletedAt().compareTo(e2.getCompletedAt());
+                            }
+                            break;
+                        case "deadline":
+                            if (e1.getDeadline() == null && e2.getDeadline() == null) {
+                                comparison = 0;
+                            } else if (e1.getDeadline() == null) {
+                                comparison = 1; // null values last
+                            } else if (e2.getDeadline() == null) {
+                                comparison = -1; // null values last
+                            } else {
+                                comparison = e1.getDeadline().compareTo(e2.getDeadline());
+                            }
+                            break;
+                        case "name":
+                            comparison = e1.getName().compareTo(e2.getName());
+                            break;
+                        case "status":
+                            comparison = e1.getStatus().compareTo(e2.getStatus());
+                            break;
+                        case "duration":
+                            Long d1 = calculateDuration(e1);
+                            Long d2 = calculateDuration(e2);
+                            if (d1 == null && d2 == null) {
+                                comparison = 0;
+                            } else if (d1 == null) {
+                                comparison = 1;
+                            } else if (d2 == null) {
+                                comparison = -1;
+                            } else {
+                                comparison = d1.compareTo(d2);
+                            }
+                            break;
+                        default:
+                            // Default to started_at for unknown sort fields
+                            comparison = e1.getStartedAt().compareTo(e2.getStartedAt());
+                    }
+                    
+                    return ascending ? comparison : -comparison;
+                })
+                .collect(Collectors.toList());
+    }
+    
+    /**
      * Applies pagination to a list of entities.
      */
     private List<ProcessEntity> applyPagination(List<ProcessEntity> entities, Pageable pageable) {
@@ -224,7 +317,7 @@ public class ProcessService {
             return true;
         }
         
-        DeadlineStatus entityStatus = entity.getDeadlineStatus();
+        DeadlineStatus entityStatus = calculateDeadlineStatus(entity);
         return entityStatus == targetStatus;
     }
     
@@ -257,7 +350,7 @@ public class ProcessService {
             return true;
         }
         
-        Long duration = entity.getDuration();
+        Long duration = calculateDuration(entity);
         return duration != null && duration >= runningDurationMin;
     }
     
@@ -273,6 +366,131 @@ public class ProcessService {
     }
     
     /**
+     * Calculates deadline status for a process entity in real-time.
+     * This method provides the business logic for deadline status calculation.
+     * 
+     * @param entity the process entity
+     * @return the calculated deadline status
+     */
+    public DeadlineStatus calculateDeadlineStatus(ProcessEntity entity) {
+        if (entity == null || entity.getDeadline() == null) {
+            return null;
+        }
+        
+        Instant now = Instant.now();
+        Instant deadline = entity.getDeadline();
+        
+        if (entity.getStatus() == ProcessStatus.ACTIVE) {
+            return now.isAfter(deadline) ? DeadlineStatus.MISSED : DeadlineStatus.ON_TRACK;
+        } else if (entity.getStatus() == ProcessStatus.COMPLETED && entity.getCompletedAt() != null) {
+            return entity.getCompletedAt().isBefore(deadline) || entity.getCompletedAt().equals(deadline)
+                ? DeadlineStatus.COMPLETED_ON_TIME 
+                : DeadlineStatus.COMPLETED_LATE;
+        }
+        
+        return null; // For FAILED status or other edge cases
+    }
+    
+    /**
+     * Calculates the current duration of a process in seconds.
+     * For active processes, calculates from start time to now.
+     * For completed processes, calculates from start time to completion time.
+     * 
+     * @param entity the process entity
+     * @return the duration in seconds, or null if start time is not available
+     */
+    public Long calculateDuration(ProcessEntity entity) {
+        if (entity == null || entity.getStartedAt() == null) {
+            return null;
+        }
+        
+        Instant endTime = entity.getCompletedAt() != null ? entity.getCompletedAt() : Instant.now();
+        return endTime.getEpochSecond() - entity.getStartedAt().getEpochSecond();
+    }
+    
+    /**
+     * Checks if a process is currently overdue.
+     * A process is overdue if it's active and past its deadline.
+     * 
+     * @param entity the process entity
+     * @return true if the process is overdue, false otherwise
+     */
+    public boolean isProcessOverdue(ProcessEntity entity) {
+        return entity != null && 
+               entity.getStatus() == ProcessStatus.ACTIVE && 
+               entity.getDeadline() != null && 
+               Instant.now().isAfter(entity.getDeadline());
+    }
+    
+    /**
+     * Converts tags JSON string to List of ProcessTag objects.
+     */
+    public List<ProcessTag> parseTagsFromJson(String tagsJson) {
+        if (tagsJson == null || tagsJson.trim().isEmpty()) {
+            return List.of();
+        }
+        
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.readValue(tagsJson, new TypeReference<List<ProcessTag>>() {});
+        } catch (JsonProcessingException e) {
+            LOG.warn("Failed to parse tags JSON: {}", tagsJson, e);
+            return List.of();
+        }
+    }
+    
+    /**
+     * Converts List of ProcessTag objects to JSON string.
+     */
+    public String convertTagsToJson(List<ProcessTag> tagsList) {
+        if (tagsList == null || tagsList.isEmpty()) {
+            return null;
+        }
+        
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.writeValueAsString(tagsList);
+        } catch (JsonProcessingException e) {
+            LOG.warn("Failed to convert tags to JSON: {}", tagsList, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Converts context JSON string to Map.
+     */
+    public Map<String, Object> parseContextFromJson(String contextJson) {
+        if (contextJson == null || contextJson.trim().isEmpty()) {
+            return Map.of();
+        }
+        
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.readValue(contextJson, new TypeReference<Map<String, Object>>() {});
+        } catch (JsonProcessingException e) {
+            LOG.warn("Failed to parse context JSON: {}", contextJson, e);
+            return Map.of();
+        }
+    }
+    
+    /**
+     * Converts Map to context JSON string.
+     */
+    public String convertContextToJson(Map<String, Object> contextMap) {
+        if (contextMap == null || contextMap.isEmpty()) {
+            return null;
+        }
+        
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.writeValueAsString(contextMap);
+        } catch (JsonProcessingException e) {
+            LOG.warn("Failed to convert context to JSON: {}", contextMap, e);
+            return null;
+        }
+    }
+    
+    /**
      * Validates process creation request parameters.
      */
     private void validateCreateRequest(String name, NewProcessRequest request) {
@@ -280,12 +498,54 @@ public class ProcessService {
             throw new IllegalArgumentException("Process name cannot be null or empty");
         }
         
+        if (name.length() > 100) {
+            throw new IllegalArgumentException("Process name cannot exceed 100 characters");
+        }
+        
+        if (request == null) {
+            throw new IllegalArgumentException("Process request cannot be null");
+        }
+        
         if (request.getId() == null || request.getId().trim().isEmpty()) {
             throw new IllegalArgumentException("Process ID cannot be null or empty");
         }
         
+        if (request.getId().length() > 50) {
+            throw new IllegalArgumentException("Process ID cannot exceed 50 characters");
+        }
+        
         if (request.getDeadline() != null && request.getDeadline() <= 0) {
             throw new IllegalArgumentException("Deadline must be a positive timestamp");
+        }
+        
+        // Validate deadline is not in the past (with some tolerance for clock skew)
+        if (request.getDeadline() != null) {
+            long currentTime = Instant.now().getEpochSecond();
+            if (request.getDeadline() < currentTime - 60) { // Allow 1 minute tolerance
+                throw new IllegalArgumentException("Deadline cannot be in the past");
+            }
+        }
+        
+        // Validate tags if present
+        if (request.getTags() != null) {
+            if (request.getTags().size() > 20) {
+                throw new IllegalArgumentException("Cannot have more than 20 tags per process");
+            }
+            
+            for (ProcessTag tag : request.getTags()) {
+                if (tag.getKey() == null || tag.getKey().trim().isEmpty()) {
+                    throw new IllegalArgumentException("Tag key cannot be null or empty");
+                }
+                if (tag.getValue() == null || tag.getValue().trim().isEmpty()) {
+                    throw new IllegalArgumentException("Tag value cannot be null or empty");
+                }
+                if (tag.getKey().length() > 50) {
+                    throw new IllegalArgumentException("Tag key cannot exceed 50 characters");
+                }
+                if (tag.getValue().length() > 100) {
+                    throw new IllegalArgumentException("Tag value cannot exceed 100 characters");
+                }
+            }
         }
     }
     
@@ -297,8 +557,16 @@ public class ProcessService {
             throw new IllegalArgumentException("Process name cannot be null or empty");
         }
         
+        if (name.length() > 100) {
+            throw new IllegalArgumentException("Process name cannot exceed 100 characters");
+        }
+        
         if (processId == null || processId.trim().isEmpty()) {
             throw new IllegalArgumentException("Process ID cannot be null or empty");
+        }
+        
+        if (processId.length() > 50) {
+            throw new IllegalArgumentException("Process ID cannot exceed 50 characters");
         }
         
         if (status == null) {
@@ -307,6 +575,27 @@ public class ProcessService {
         
         if (status == ProcessStatus.ACTIVE) {
             throw new IllegalArgumentException("Cannot complete process with ACTIVE status");
+        }
+    }
+    
+    /**
+     * Validates process retrieval parameters.
+     */
+    private void validateGetRequest(String name, String processId) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Process name cannot be null or empty");
+        }
+        
+        if (name.length() > 100) {
+            throw new IllegalArgumentException("Process name cannot exceed 100 characters");
+        }
+        
+        if (processId == null || processId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Process ID cannot be null or empty");
+        }
+        
+        if (processId.length() > 50) {
+            throw new IllegalArgumentException("Process ID cannot exceed 50 characters");
         }
     }
 }

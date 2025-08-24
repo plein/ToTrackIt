@@ -1,4 +1,14 @@
 # Docker environment configuration
+micronaut:
+  application:
+    name: totrackit
+  server:
+    port: 8080
+    host: 0.0.0.0
+  data:
+    default:
+      dialect: POSTGRES
+
 datasources:
   default:
     url: jdbc:postgresql://postgres:5432/totrackit
@@ -24,13 +34,6 @@ jpa:
           auto: validate
         show_sql: false
         format_sql: false
-
-micronaut:
-  application:
-    name: totrackit
-  server:
-    port: 8080
-    host: 0.0.0.0
 
 logger:
   levels:

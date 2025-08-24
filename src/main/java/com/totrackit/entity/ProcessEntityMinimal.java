@@ -1,29 +1,21 @@
 package com.totrackit.entity;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.totrackit.model.DeadlineStatus;
 import com.totrackit.model.ProcessStatus;
-import com.totrackit.model.ProcessTag;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.data.annotation.GeneratedValue;
 import io.micronaut.data.annotation.Id;
 import io.micronaut.data.annotation.MappedEntity;
 import io.micronaut.data.annotation.MappedProperty;
-import io.micronaut.data.model.DataType;
-
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 /**
- * JPA Entity representing a process in the database.
+ * Minimal JPA Entity representing a process in the database.
+ * This version excludes all computed properties to avoid persistence issues.
  */
 @MappedEntity("processes")
 @Introspected
-public class ProcessEntity {
+public class ProcessEntityMinimal {
     
     @Id
     @GeneratedValue
@@ -44,10 +36,8 @@ public class ProcessEntity {
     
     private Instant deadline;
     
-    @MappedProperty(value = "tags", type = DataType.JSON)
     private String tags;
     
-    @MappedProperty(value = "context", type = DataType.JSON)
     private String context;
     
     @MappedProperty("created_at")
@@ -57,7 +47,7 @@ public class ProcessEntity {
     private Instant updatedAt;
     
     // Default constructor
-    public ProcessEntity() {
+    public ProcessEntityMinimal() {
         Instant now = Instant.now();
         this.startedAt = now;
         this.createdAt = now;
@@ -65,13 +55,13 @@ public class ProcessEntity {
     }
     
     // Constructor with required fields
-    public ProcessEntity(String processId, String name) {
+    public ProcessEntityMinimal(String processId, String name) {
         this();
         this.processId = processId;
         this.name = name;
     }
     
-    // Getters and setters
+    // Getters and setters - only basic properties
     public Long getId() {
         return id;
     }
@@ -162,19 +152,11 @@ public class ProcessEntity {
         this.updatedAt = updatedAt;
     }
     
-    // Note: Computed properties like deadline status, duration, and overdue status
-    // are calculated in the service layer to avoid persistence issues
-    
-    // Helper methods for JSON serialization/deserialization
-    
-    // Note: JSON conversion methods for tags and context are handled in the service layer
-    // to avoid persistence issues with computed properties
-    
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ProcessEntity that = (ProcessEntity) o;
+        ProcessEntityMinimal that = (ProcessEntityMinimal) o;
         return Objects.equals(id, that.id);
     }
     
@@ -185,7 +167,7 @@ public class ProcessEntity {
     
     @Override
     public String toString() {
-        return "ProcessEntity{" +
+        return "ProcessEntityMinimal{" +
                 "id=" + id +
                 ", processId='" + processId + '\'' +
                 ", name='" + name + '\'' +

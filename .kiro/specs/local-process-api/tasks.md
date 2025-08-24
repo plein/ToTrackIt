@@ -34,14 +34,14 @@
   - Add method to check for existing active processes
   - _Requirements: 1.1, 2.1, 3.1, 4.1, 4.2_
 
-- [ ] 6. Build process service layer
+- [x] 6. Build process service layer
   - Implement ProcessService with business logic for process lifecycle
   - Add validation for process creation and completion rules
   - Write deadline status calculation logic
   - Implement filtering and pagination logic for process listing
   - _Requirements: 1.1, 1.4, 2.1, 2.3, 3.1, 4.1, 4.5_
 
-- [ ] 7. Create process creation endpoint
+- [x] 7. Create process creation endpoint
   - Implement POST /processes/{name} controller method
   - Add request validation and error handling
   - Write business logic to prevent duplicate active processes

@@ -5,6 +5,8 @@ import com.totrackit.model.DeadlineStatus;
 import com.totrackit.model.ProcessStatus;
 import io.micronaut.data.annotation.Query;
 import io.micronaut.data.annotation.Repository;
+import io.micronaut.data.jdbc.annotation.JdbcRepository;
+import io.micronaut.data.model.query.builder.sql.Dialect;
 import io.micronaut.data.repository.CrudRepository;
 
 import java.time.Instant;
@@ -15,7 +17,7 @@ import java.util.Optional;
  * Repository interface for ProcessEntity operations.
  * Provides CRUD operations and custom queries for process management.
  */
-@Repository
+@JdbcRepository(dialect = Dialect.POSTGRES)
 public interface ProcessRepository extends CrudRepository<ProcessEntity, Long> {
     
     /**

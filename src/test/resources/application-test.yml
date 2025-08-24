@@ -1,6 +1,9 @@
 micronaut:
   application:
     name: totrackit-api-test
+  data:
+    default:
+      dialect: H2
 
 datasources:
   default:
@@ -25,3 +28,4 @@ jpa:
 logger:
   levels:
     com.totrackit: DEBUG
+    io.micronaut.data: DEBUG

@@ -3,6 +3,11 @@ micronaut:
     name: totrackit-api
   server:
     port: 8080
+  data:
+    default:
+      dialect: POSTGRES
+    pageable:
+      max-page-size: 1000
 
 datasources:
   default:
@@ -19,15 +24,6 @@ flyway:
       locations: classpath:db/migration
       baseline-on-migrate: true
       baseline-version: 0
-
-jpa:
-  default:
-    properties:
-      hibernate:
-        hbm2ddl:
-          auto: validate
-        show_sql: false
-        format_sql: false
 
 logger:
   levels:
