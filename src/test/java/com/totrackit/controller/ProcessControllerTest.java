@@ -6,7 +6,9 @@ import com.totrackit.dto.ProcessResponse;
 import com.totrackit.exception.ProcessAlreadyCompletedException;
 import com.totrackit.exception.ProcessAlreadyExistsException;
 import com.totrackit.exception.ProcessNotFoundException;
+import com.totrackit.model.DeadlineStatus;
 import com.totrackit.model.ProcessStatus;
+import com.totrackit.model.ProcessTag;
 import com.totrackit.service.ProcessService;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -16,6 +18,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -273,6 +278,161 @@ public class ProcessControllerTest {
         assertEquals(processName, processResponse.getName());
         assertEquals(ProcessStatus.COMPLETED, processResponse.getStatus());
         assertNotNull(processResponse.getCompletedAt());
+        assertNotNull(processResponse.getDuration());
+    }
+    
+    @Test
+    public void testGetProcess_Success() {
+        // Given
+        String processName = "test-process";
+        String processId = "test-id-001";
+        
+        ProcessResponse expectedResponse = new ProcessResponse();
+        expectedResponse.setId(processId);
+        expectedResponse.setName(processName);
+        expectedResponse.setStatus(ProcessStatus.ACTIVE);
+        expectedResponse.setDeadlineStatus(DeadlineStatus.ON_TRACK);
+        expectedResponse.setStartedAt(System.currentTimeMillis() / 1000 - 1800); // Started 30 minutes ago
+        expectedResponse.setDeadline(System.currentTimeMillis() / 1000 + 1800); // Deadline in 30 minutes
+        expectedResponse.setDuration(1800L); // 30 minutes duration
+        expectedResponse.setTags(List.of(new ProcessTag("environment", "production")));
+        expectedResponse.setContext(Map.of("user_id", "12345", "batch_size", 100));
+        
+        when(processService.getProcess(eq(processName), eq(processId)))
+                .thenReturn(expectedResponse);
+        
+        // When
+        HttpResponse<ProcessResponse> response = processController.getProcess(processName, processId);
+        
+        // Then
+        assertEquals(HttpStatus.OK, response.getStatus());
+        assertNotNull(response.body());
+        
+        ProcessResponse processResponse = response.body();
+        assertEquals(processId, processResponse.getId());
+        assertEquals(processName, processResponse.getName());
+        assertEquals(ProcessStatus.ACTIVE, processResponse.getStatus());
+        assertEquals(DeadlineStatus.ON_TRACK, processResponse.getDeadlineStatus());
+        assertNotNull(processResponse.getStartedAt());
+        assertNotNull(processResponse.getDeadline());
+        assertNotNull(processResponse.getDuration());
+        assertNotNull(processResponse.getTags());
+        assertNotNull(processResponse.getContext());
+        assertEquals(1, processResponse.getTags().size());
+        assertEquals("environment", processResponse.getTags().get(0).getKey());
+        assertEquals("production", processResponse.getTags().get(0).getValue());
+        assertEquals("12345", processResponse.getContext().get("user_id"));
+        assertEquals(100, processResponse.getContext().get("batch_size"));
+    }
+    
+    @Test
+    public void testGetProcess_CompletedProcess() {
+        // Given
+        String processName = "completed-process";
+        String processId = "completed-id";
+        
+        ProcessResponse expectedResponse = new ProcessResponse();
+        expectedResponse.setId(processId);
+        expectedResponse.setName(processName);
+        expectedResponse.setStatus(ProcessStatus.COMPLETED);
+        expectedResponse.setDeadlineStatus(DeadlineStatus.COMPLETED_ON_TIME);
+        expectedResponse.setStartedAt(System.currentTimeMillis() / 1000 - 3600); // Started 1 hour ago
+        expectedResponse.setCompletedAt(System.currentTimeMillis() / 1000 - 600); // Completed 10 minutes ago
+        expectedResponse.setDeadline(System.currentTimeMillis() / 1000); // Deadline now
+        expectedResponse.setDuration(3000L); // 50 minutes duration
+        expectedResponse.setTags(List.of());
+        expectedResponse.setContext(Map.of());
+        
+        when(processService.getProcess(eq(processName), eq(processId)))
+                .thenReturn(expectedResponse);
+        
+        // When
+        HttpResponse<ProcessResponse> response = processController.getProcess(processName, processId);
+        
+        // Then
+        assertEquals(HttpStatus.OK, response.getStatus());
+        assertNotNull(response.body());
+        
+        ProcessResponse processResponse = response.body();
+        assertEquals(processId, processResponse.getId());
+        assertEquals(processName, processResponse.getName());
+        assertEquals(ProcessStatus.COMPLETED, processResponse.getStatus());
+        assertEquals(DeadlineStatus.COMPLETED_ON_TIME, processResponse.getDeadlineStatus());
+        assertNotNull(processResponse.getStartedAt());
+        assertNotNull(processResponse.getCompletedAt());
+        assertNotNull(processResponse.getDeadline());
+        assertNotNull(processResponse.getDuration());
+        assertEquals(3000L, processResponse.getDuration());
+    }
+    
+    @Test
+    public void testGetProcess_ProcessNotFound() {
+        // Given
+        String processName = "nonexistent-process";
+        String processId = "nonexistent-id";
+        
+        when(processService.getProcess(eq(processName), eq(processId)))
+                .thenThrow(new ProcessNotFoundException(processName, processId));
+        
+        // When & Then
+        ProcessNotFoundException exception = assertThrows(ProcessNotFoundException.class, () -> {
+            processController.getProcess(processName, processId);
+        });
+        
+        assertTrue(exception.getMessage().contains("nonexistent-process"));
+        assertTrue(exception.getMessage().contains("nonexistent-id"));
+    }
+    
+    @Test
+    public void testGetProcess_ServiceException() {
+        // Given
+        String processName = "error-process";
+        String processId = "error-id";
+        
+        when(processService.getProcess(eq(processName), eq(processId)))
+                .thenThrow(new RuntimeException("Service error"));
+        
+        // When & Then
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            processController.getProcess(processName, processId);
+        });
+        
+        assertEquals("Service error", exception.getMessage());
+    }
+    
+    @Test
+    public void testGetProcess_WithoutDeadline() {
+        // Given
+        String processName = "no-deadline-process";
+        String processId = "no-deadline-id";
+        
+        ProcessResponse expectedResponse = new ProcessResponse();
+        expectedResponse.setId(processId);
+        expectedResponse.setName(processName);
+        expectedResponse.setStatus(ProcessStatus.ACTIVE);
+        expectedResponse.setDeadlineStatus(null); // No deadline status when no deadline
+        expectedResponse.setStartedAt(System.currentTimeMillis() / 1000 - 900); // Started 15 minutes ago
+        expectedResponse.setDeadline(null); // No deadline
+        expectedResponse.setDuration(900L); // 15 minutes duration
+        expectedResponse.setTags(List.of());
+        expectedResponse.setContext(Map.of());
+        
+        when(processService.getProcess(eq(processName), eq(processId)))
+                .thenReturn(expectedResponse);
+        
+        // When
+        HttpResponse<ProcessResponse> response = processController.getProcess(processName, processId);
+        
+        // Then
+        assertEquals(HttpStatus.OK, response.getStatus());
+        assertNotNull(response.body());
+        
+        ProcessResponse processResponse = response.body();
+        assertEquals(processId, processResponse.getId());
+        assertEquals(processName, processResponse.getName());
+        assertEquals(ProcessStatus.ACTIVE, processResponse.getStatus());
+        assertNull(processResponse.getDeadlineStatus());
+        assertNull(processResponse.getDeadline());
         assertNotNull(processResponse.getDuration());
     }
 }

@@ -33,9 +33,12 @@ class ProcessMapperTest {
         assertEquals(1640998800L, response.getDeadline());
         assertNotNull(response.getDuration());
         
-        // Note: Current mapper returns empty collections for tags/context to avoid JSON parsing
-        assertEquals(0, response.getTags().size());
-        assertEquals(0, response.getContext().size());
+        // Verify tags and context are parsed correctly
+        assertEquals(1, response.getTags().size());
+        assertEquals("env", response.getTags().get(0).getKey());
+        assertEquals("prod", response.getTags().get(0).getValue());
+        assertEquals(1, response.getContext().size());
+        assertEquals("123", response.getContext().get("user_id"));
     }
 
     @Test

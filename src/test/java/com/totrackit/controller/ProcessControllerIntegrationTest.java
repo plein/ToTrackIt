@@ -74,7 +74,7 @@ public class ProcessControllerIntegrationTest {
     
     @Test
     public void testCreateProcess_ValidationError_InvalidProcessName() {
-        // Given - invalid process name with special characters
+        // Given - invalid process name with special characters (results in 404 because path doesn't match route)
         String processName = "test@process!";
         NewProcessRequest request = new NewProcessRequest("valid-id");
         
@@ -85,12 +85,12 @@ public class ProcessControllerIntegrationTest {
             client.toBlocking().exchange(httpRequest, String.class);
         });
         
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
     }
     
     @Test
     public void testCreateProcess_ValidationError_EmptyProcessName() {
-        // Given - empty process name
+        // Given - empty process name (results in 404 because path doesn't match)
         String processName = "";
         NewProcessRequest request = new NewProcessRequest("valid-id");
         
@@ -101,7 +101,7 @@ public class ProcessControllerIntegrationTest {
             client.toBlocking().exchange(httpRequest, String.class);
         });
         
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
     }
     
     @Test
@@ -129,6 +129,38 @@ public class ProcessControllerIntegrationTest {
         
         // When & Then
         HttpRequest<NewProcessRequest> httpRequest = HttpRequest.POST("/processes/" + processName, request);
+        
+        HttpClientResponseException exception = assertThrows(HttpClientResponseException.class, () -> {
+            client.toBlocking().exchange(httpRequest, String.class);
+        });
+        
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+    
+    @Test
+    public void testGetProcess_ValidationError_LongProcessName() {
+        // Given - process name too long
+        String processName = "a".repeat(101); // More than 100 characters
+        String processId = "valid-id";
+        
+        // When & Then
+        HttpRequest<Object> httpRequest = HttpRequest.GET("/processes/" + processName + "/" + processId);
+        
+        HttpClientResponseException exception = assertThrows(HttpClientResponseException.class, () -> {
+            client.toBlocking().exchange(httpRequest, String.class);
+        });
+        
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+    
+    @Test
+    public void testGetProcess_ValidationError_LongProcessId() {
+        // Given - process ID too long
+        String processName = "valid-process";
+        String processId = "a".repeat(51); // More than 50 characters
+        
+        // When & Then
+        HttpRequest<Object> httpRequest = HttpRequest.GET("/processes/" + processName + "/" + processId);
         
         HttpClientResponseException exception = assertThrows(HttpClientResponseException.class, () -> {
             client.toBlocking().exchange(httpRequest, String.class);

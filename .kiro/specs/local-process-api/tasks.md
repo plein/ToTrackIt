@@ -55,7 +55,7 @@
   - Handle conflict cases for already completed processes
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 6.3, 6.4_
 
-- [ ] 9. Build process retrieval endpoint
+- [x] 9. Build process retrieval endpoint
   - Implement GET /processes/{name}/{id} controller method
   - Add proper error handling for non-existent processes
   - Include computed fields like duration and deadline status

@@ -9,6 +9,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
@@ -58,6 +59,35 @@ public class ProcessController {
             
         } catch (Exception e) {
             LOG.error("Failed to create process: name='{}', request={}", name, request, e);
+            throw e;
+        }
+    }
+    
+    @Get("/{name}/{id}")
+    public HttpResponse<ProcessResponse> getProcess(
+            @PathVariable 
+            @NotBlank(message = "Process name is required")
+            @Size(min = 1, max = 100, message = "Process name must be between 1 and 100 characters")
+            @Pattern(regexp = "^[a-zA-Z0-9_-]+$", message = "Process name can only contain letters, numbers, underscores, and hyphens")
+            String name,
+            
+            @PathVariable("id")
+            @NotBlank(message = "Process ID is required")
+            @Size(min = 1, max = 50, message = "Process ID must be between 1 and 50 characters")
+            String processId) {
+        
+        LOG.info("Retrieving process: name='{}', id='{}'", name, processId);
+        
+        try {
+            ProcessResponse response = processService.getProcess(name, processId);
+            
+            LOG.info("Successfully retrieved process: name='{}', id='{}', status={}", 
+                    name, processId, response.getStatus());
+            
+            return HttpResponse.ok(response);
+            
+        } catch (Exception e) {
+            LOG.error("Failed to retrieve process: name='{}', id='{}'", name, processId, e);
             throw e;
         }
     }
