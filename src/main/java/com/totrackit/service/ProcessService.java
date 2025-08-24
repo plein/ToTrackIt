@@ -44,7 +44,7 @@ public class ProcessService {
     
     /**
      * Creates a new process with the given name and request parameters.
-     * Validates that no active process exists with the same name and ID.
+     * Uses optimal pattern: single insert with database uniqueness enforcement.
      * 
      * @param name the process name
      * @param request the process creation request
@@ -57,11 +57,6 @@ public class ProcessService {
         
         // Validate input parameters
         validateCreateRequest(name, request);
-        
-        // Validate that no active process exists with the same name and ID
-        if (processRepository.existsActiveProcess(name, request.getId())) {
-            throw new ProcessAlreadyExistsException(name, request.getId());
-        }
         
         // Create new process entity
         ProcessEntity entity = new ProcessEntity(request.getId(), name);
@@ -79,12 +74,23 @@ public class ProcessService {
             entity.setContext(convertContextToJson(request.getContext()));
         }
         
-        // Save to database
-        ProcessEntity savedEntity = processRepository.save(entity);
-        
-        LOG.info("Created process: name='{}', id='{}', dbId={}", name, request.getId(), savedEntity.getId());
-        
-        return processMapper.toResponse(savedEntity);
+        try {
+            // Single insert - let database enforce uniqueness via partial unique index
+            ProcessEntity savedEntity = processRepository.save(entity);
+            
+            LOG.info("Created process: name='{}', id='{}', dbId={}", name, request.getId(), savedEntity.getId());
+            
+            return processMapper.toResponse(savedEntity);
+            
+        } catch (Exception e) {
+            // Check if this is a unique constraint violation on our partial index
+            if (isUniqueConstraintViolation(e)) {
+                LOG.debug("Active process already exists: name='{}', id='{}'", name, request.getId());
+                throw new ProcessAlreadyExistsException(name, request.getId());
+            }
+            // Re-throw other exceptions
+            throw e;
+        }
     }
     
     /**
@@ -597,5 +603,54 @@ public class ProcessService {
         if (processId.length() > 50) {
             throw new IllegalArgumentException("Process ID cannot exceed 50 characters");
         }
+    }
+    
+    /**
+     * Checks if the given exception is a unique constraint violation.
+     * Specifically detects violations of our partial unique index for active processes.
+     * 
+     * @param e the exception to check
+     * @return true if this is a unique constraint violation, false otherwise
+     */
+    private boolean isUniqueConstraintViolation(Exception e) {
+        // Walk the exception chain to find the root cause
+        Throwable cause = e;
+        while (cause != null) {
+            String message = cause.getMessage();
+            if (message != null) {
+                // PostgreSQL unique constraint violation on our specific index
+                if (message.contains("duplicate key value violates unique constraint") &&
+                    message.contains("idx_processes_unique_active")) {
+                    return true;
+                }
+                
+                // Generic unique constraint patterns as fallback
+                if (message.contains("duplicate key value violates unique constraint") &&
+                    message.contains("processes")) {
+                    return true;
+                }
+                
+                // Generic data integrity violation patterns
+                if (message.contains("DataIntegrityViolationException") &&
+                    message.contains("duplicate key")) {
+                    return true;
+                }
+                
+                if (message.contains("ConstraintViolationException")) {
+                    return true;
+                }
+            }
+            
+            // Check exception type
+            String className = cause.getClass().getName();
+            if (className.contains("DataIntegrityViolationException") ||
+                className.contains("ConstraintViolationException")) {
+                return true;
+            }
+            
+            cause = cause.getCause();
+        }
+        
+        return false;
     }
 }
