@@ -1,0 +1,101 @@
+# Development Docker Compose Configuration
+# This configuration provides database-only services for hybrid development workflow
+# where developers can run the application natively while using containerized database
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: totrackit-postgres-dev
+    environment:
+      POSTGRES_DB: totrackit
+      POSTGRES_USER: totrackit
+      POSTGRES_PASSWORD: totrackit
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U totrackit -d totrackit"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - totrackit-dev-network
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Redis for caching (can be enabled when needed)
+  redis:
+    image: redis:7-alpine
+    container_name: totrackit-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - totrackit-dev-network
+    restart: unless-stopped
+    profiles:
+      - cache
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Optional: Application container for full Docker development
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: totrackit-app-dev
+    ports:
+      - "8080:8080"
+      - "5005:5005"  # Debug port
+    environment:
+      DATASOURCES_DEFAULT_URL: jdbc:postgresql://postgres:5432/totrackit
+      DATASOURCES_DEFAULT_USERNAME: totrackit
+      DATASOURCES_DEFAULT_PASSWORD: totrackit
+      MICRONAUT_ENVIRONMENTS: docker
+      JAVA_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - ./src:/app/src:ro  # Mount source for hot reload (when supported)
+    networks:
+      - totrackit-dev-network
+    restart: unless-stopped
+    profiles:
+      - app
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+
+networks:
+  totrackit-dev-network:
+    driver: bridge
+    name: totrackit-dev

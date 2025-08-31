@@ -42,3 +42,9 @@ logger:
   levels:
     com.totrackit: DEBUG
     io.micronaut.data: DEBUG
+
+endpoints:
+  all:
+    enabled: false
+  health:
+    enabled: false

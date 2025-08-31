@@ -14,9 +14,96 @@ servers:
 - url: http://localhost:8080
   description: Local development server
 tags:
+- name: Health
+  description: Health check and monitoring endpoints
 - name: Processes
   description: Process tracking and management operations
 paths:
+  /health:
+    get:
+      tags:
+      - Health
+      summary: Basic health check
+      description: Returns basic application health status with component details
+      operationId: health
+      responses:
+        "200":
+          description: Application is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                allOf: []
+                anyOf: []
+                oneOf: []
+        "503":
+          description: Application is unhealthy
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                allOf: []
+                anyOf: []
+                oneOf: []
+  /health/live:
+    get:
+      tags:
+      - Health
+      summary: Liveness probe
+      description: Returns liveness status indicating if the application is responsive
+      operationId: live
+      responses:
+        "200":
+          description: Application is alive and responsive
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                allOf: []
+                anyOf: []
+                oneOf: []
+        "503":
+          description: Application is not responsive
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                allOf: []
+                anyOf: []
+                oneOf: []
+  /health/ready:
+    get:
+      tags:
+      - Health
+      summary: Readiness probe
+      description: Returns readiness status including database connectivity and migration
+        status
+      operationId: ready
+      responses:
+        "200":
+          description: Application is ready to serve requests
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                allOf: []
+                anyOf: []
+                oneOf: []
+        "503":
+          description: Application is not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                allOf: []
+                anyOf: []
+                oneOf: []
   /openapi.yml:
     get:
       operationId: getOpenApiSpec

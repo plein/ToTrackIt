@@ -32,6 +32,9 @@ dependencies {
     annotationProcessor("io.micronaut.data:micronaut-data-processor")
     runtimeOnly("org.postgresql:postgresql")
     
+    // Management and health checks
+    implementation("io.micronaut:micronaut-management")
+    
     // Logging
     runtimeOnly("ch.qos.logback:logback-classic")
     
