@@ -7,6 +7,7 @@ import com.totrackit.exception.ProcessAlreadyExistsException;
 import com.totrackit.model.ProcessStatus;
 import com.totrackit.model.ProcessTag;
 import com.totrackit.repository.ProcessRepository;
+import com.totrackit.service.MetricsService;
 import com.totrackit.util.ProcessMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,12 +33,15 @@ class ProcessServiceCreatePatternTest {
     @Mock
     private ProcessMapper processMapper;
     
+    @Mock
+    private MetricsService metricsService;
+    
     private ProcessService processService;
     
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        processService = new ProcessService(processRepository, processMapper);
+        processService = new ProcessService(processRepository, processMapper, metricsService);
     }
     
     @Test

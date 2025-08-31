@@ -35,6 +35,13 @@ dependencies {
     // Management and health checks
     implementation("io.micronaut:micronaut-management")
     
+    // Metrics and monitoring
+    implementation("io.micronaut.micrometer:micronaut-micrometer-core")
+    implementation("io.micronaut.micrometer:micronaut-micrometer-registry-prometheus")
+    
+    // Reactive streams for HTTP filter
+    implementation("io.micronaut.reactor:micronaut-reactor")
+    
     // Logging
     runtimeOnly("ch.qos.logback:logback-classic")
     

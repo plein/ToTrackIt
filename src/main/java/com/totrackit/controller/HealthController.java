@@ -39,7 +39,7 @@ public class HealthController {
     /**
      * Basic health check endpoint providing overall application status
      */
-    @Get("/health")
+    @Get("/health/status")
     @Operation(
         summary = "Basic health check",
         description = "Returns basic application health status with component details"

@@ -4,6 +4,7 @@ import com.totrackit.entity.ProcessEntity;
 import com.totrackit.model.DeadlineStatus;
 import com.totrackit.model.ProcessStatus;
 import com.totrackit.repository.ProcessRepository;
+import com.totrackit.service.MetricsService;
 import com.totrackit.util.ProcessMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,12 +26,15 @@ class ProcessServiceBusinessLogicTest {
     @Mock
     private ProcessMapper processMapper;
     
+    @Mock
+    private MetricsService metricsService;
+    
     private ProcessService processService;
     
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        processService = new ProcessService(processRepository, processMapper);
+        processService = new ProcessService(processRepository, processMapper, metricsService);
     }
     
     @Test

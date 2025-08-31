@@ -8,6 +8,16 @@ micronaut:
   data:
     default:
       dialect: POSTGRES
+  metrics:
+    enabled: true
+    export:
+      prometheus:
+        enabled: true
+        step: PT1M
+        descriptions: true
+  task:
+    scheduler:
+      enabled: true
 
 datasources:
   default:
@@ -34,6 +44,16 @@ jpa:
           auto: validate
         show_sql: false
         format_sql: false
+
+endpoints:
+  all:
+    enabled: false
+  health:
+    enabled: true
+  metrics:
+    enabled: true
+  prometheus:
+    enabled: true
 
 logger:
   levels:

@@ -21,6 +21,9 @@ micronaut:
     server:
       description: ToTrackIt API Server
       url: http://localhost:8080
+  task:
+    scheduler:
+      enabled: true
 
 datasources:
   default:
@@ -47,4 +50,17 @@ endpoints:
   all:
     enabled: false
   health:
-    enabled: false
+    enabled: true
+  metrics:
+    enabled: true
+  prometheus:
+    enabled: true
+
+micronaut:
+  metrics:
+    enabled: true
+    export:
+      prometheus:
+        enabled: true
+        step: PT1M
+        descriptions: true

@@ -19,34 +19,6 @@ tags:
 - name: Processes
   description: Process tracking and management operations
 paths:
-  /health:
-    get:
-      tags:
-      - Health
-      summary: Basic health check
-      description: Returns basic application health status with component details
-      operationId: health
-      responses:
-        "200":
-          description: Application is healthy
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-                allOf: []
-                anyOf: []
-                oneOf: []
-        "503":
-          description: Application is unhealthy
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-                allOf: []
-                anyOf: []
-                oneOf: []
   /health/live:
     get:
       tags:
@@ -96,6 +68,34 @@ paths:
                 oneOf: []
         "503":
           description: Application is not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                allOf: []
+                anyOf: []
+                oneOf: []
+  /health/status:
+    get:
+      tags:
+      - Health
+      summary: Basic health check
+      description: Returns basic application health status with component details
+      operationId: health
+      responses:
+        "200":
+          description: Application is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                allOf: []
+                anyOf: []
+                oneOf: []
+        "503":
+          description: Application is unhealthy
           content:
             application/json:
               schema:

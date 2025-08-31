@@ -35,11 +35,13 @@ public class ProcessService {
     
     private final ProcessRepository processRepository;
     private final ProcessMapper processMapper;
+    private final MetricsService metricsService;
     
     @Inject
-    public ProcessService(ProcessRepository processRepository, ProcessMapper processMapper) {
+    public ProcessService(ProcessRepository processRepository, ProcessMapper processMapper, MetricsService metricsService) {
         this.processRepository = processRepository;
         this.processMapper = processMapper;
+        this.metricsService = metricsService;
     }
     
     /**
@@ -78,11 +80,18 @@ public class ProcessService {
             // Single insert - let database enforce uniqueness via partial unique index
             ProcessEntity savedEntity = processRepository.save(entity);
             
+            // Record metrics for successful process creation
+            metricsService.recordProcessCreated(name);
+            metricsService.recordDatabaseOperation("create", "processes", true);
+            
             LOG.info("Created process: name='{}', id='{}', dbId={}", name, request.getId(), savedEntity.getId());
             
             return processMapper.toResponse(savedEntity);
             
         } catch (Exception e) {
+            // Record failed database operation
+            metricsService.recordDatabaseOperation("create", "processes", false);
+            
             // Check if this is a unique constraint violation on our partial index
             if (isUniqueConstraintViolation(e)) {
                 LOG.debug("Active process already exists: name='{}', id='{}'", name, request.getId());
@@ -107,10 +116,19 @@ public class ProcessService {
         // Validate input parameters
         validateGetRequest(name, processId);
         
-        ProcessEntity entity = processRepository.findByNameAndProcessId(name, processId)
-                .orElseThrow(() -> new ProcessNotFoundException(name, processId));
-        
-        return processMapper.toResponse(entity);
+        try {
+            ProcessEntity entity = processRepository.findByNameAndProcessId(name, processId)
+                    .orElseThrow(() -> new ProcessNotFoundException(name, processId));
+            
+            // Record successful database read operation
+            metricsService.recordDatabaseOperation("read", "processes", true);
+            
+            return processMapper.toResponse(entity);
+        } catch (ProcessNotFoundException e) {
+            // Record failed database read operation
+            metricsService.recordDatabaseOperation("read", "processes", false);
+            throw e;
+        }
     }
     
     /**
@@ -143,12 +161,22 @@ public class ProcessService {
         entity.setStatus(status);
         entity.setCompletedAt(Instant.now());
         
-        ProcessEntity savedEntity = processRepository.update(entity);
-        
-        LOG.info("Completed process: name='{}', id='{}', status={}, duration={}s", 
-                name, processId, status, calculateDuration(savedEntity));
-        
-        return processMapper.toResponse(savedEntity);
+        try {
+            ProcessEntity savedEntity = processRepository.update(entity);
+            
+            // Record metrics for process completion
+            metricsService.recordProcessCompleted(savedEntity);
+            metricsService.recordDatabaseOperation("update", "processes", true);
+            
+            LOG.info("Completed process: name='{}', id='{}', status={}, duration={}s", 
+                    name, processId, status, calculateDuration(savedEntity));
+            
+            return processMapper.toResponse(savedEntity);
+        } catch (Exception e) {
+            // Record failed database operation
+            metricsService.recordDatabaseOperation("update", "processes", false);
+            throw e;
+        }
     }
     
     /**
@@ -181,6 +209,9 @@ public class ProcessService {
                     0 // No offset
             );
             
+            // Record successful database read operation
+            metricsService.recordDatabaseOperation("read", "processes", true);
+            
             LOG.debug("Retrieved {} entities from repository", entities.size());
             
             // Apply additional filtering that can't be done at database level
@@ -211,6 +242,8 @@ public class ProcessService {
             return result;
             
         } catch (Exception e) {
+            // Record failed database operation
+            metricsService.recordDatabaseOperation("read", "processes", false);
             LOG.error("Error listing processes", e);
             throw e;
         }
