@@ -49,6 +49,48 @@ cd totrackit
 ./gradlew test
 ```
 
+## 📖 API Documentation
+
+ToTrackIt provides comprehensive API documentation through Swagger/OpenAPI, generated directly from the code to ensure it's always up-to-date with the actual implementation.
+
+### Accessing API Documentation
+
+**Option 1: Built-in Swagger UI (Recommended)**
+When running the application locally:
+```bash
+./gradlew run
+```
+Visit: http://localhost:8080/swagger-ui
+
+**Option 2: Docker Compose with Static UI**
+```bash
+docker-compose up -d
+```
+Visit: http://localhost:8081 (uses static api.yaml file)
+
+**Option 3: Raw OpenAPI Specification**
+Get the machine-readable OpenAPI spec:
+```bash
+curl http://localhost:8080/openapi.yml
+```
+
+### Key Features of Generated Documentation
+
+- **Always Current**: Generated from actual controller code and annotations
+- **Interactive**: Test API endpoints directly from the browser
+- **Comprehensive**: Includes request/response schemas, validation rules, and examples
+- **Type-Safe**: Reflects actual Java types and validation constraints
+
+### Updating Documentation
+
+The OpenAPI specification is automatically generated during compilation. To update:
+
+```bash
+./gradlew copyOpenApiSpec
+```
+
+This copies the generated spec from `build/classes/java/main/META-INF/swagger/` to `src/main/resources/openapi.yml` for runtime access.
+
 ### Quick Start with Docker Compose
 
 ```bash

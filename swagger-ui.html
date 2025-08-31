@@ -33,7 +33,7 @@
     <script>
         window.onload = function () {
             const ui = SwaggerUIBundle({
-                url: './api.yaml',
+                url: 'http://localhost:8080/openapi.yml',
                 dom_id: '#swagger-ui',
                 deepLinking: true,
                 presets: [
@@ -43,14 +43,7 @@
                 plugins: [
                     SwaggerUIBundle.plugins.DownloadUrl
                 ],
-                layout: "StandaloneLayout",
-                // Configure the server to point to your local API
-                servers: [
-                    {
-                        url: 'http://localhost:8080/v1/',
-                        description: 'Local Development Server'
-                    }
-                ]
+                layout: "StandaloneLayout"
             });
         };
     </script>

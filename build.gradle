@@ -18,6 +18,11 @@ dependencies {
     implementation("io.micronaut.validation:micronaut-validation")
     implementation("io.micronaut.serde:micronaut-serde-jackson")
     
+    // OpenAPI/Swagger
+    implementation("io.micronaut.openapi:micronaut-openapi")
+    implementation("io.swagger.core.v3:swagger-annotations")
+    annotationProcessor("io.micronaut.openapi:micronaut-openapi")
+    
     // Database dependencies
     implementation("io.micronaut.data:micronaut-data-jdbc")
     implementation("io.micronaut.data:micronaut-data-tx")
@@ -63,3 +68,15 @@ micronaut {
         annotations("com.totrackit.*")
     }
 }
+
+// Task to copy generated OpenAPI spec to resources
+task copyOpenApiSpec(type: Copy) {
+    dependsOn compileJava
+    from "${buildDir}/classes/java/main/META-INF/swagger/totrackit-api-0.1.yml"
+    into "${projectDir}/src/main/resources"
+    rename { "openapi.yml" }
+}
+
+// Make sure the OpenAPI spec is copied when building
+processResources.dependsOn copyOpenApiSpec
+inspectRuntimeClasspath.dependsOn copyOpenApiSpec

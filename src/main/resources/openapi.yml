@@ -1,0 +1,352 @@
+openapi: 3.0.1
+info:
+  title: ToTrackIt API
+  description: Open-source SaaS platform for tracking and monitoring asynchronous
+    processes
+  contact:
+    name: ToTrackIt
+    url: https://github.com/plein/ToTrackIt
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  version: "0.1"
+servers:
+- url: http://localhost:8080
+  description: Local development server
+tags:
+- name: Processes
+  description: Process tracking and management operations
+paths:
+  /openapi.yml:
+    get:
+      operationId: getOpenApiSpec
+      responses:
+        "200":
+          description: getOpenApiSpec 200 response
+          content:
+            text/plain:
+              schema:
+                type: string
+  /processes:
+    get:
+      tags:
+      - Processes
+      summary: List processes
+      description: Retrieve a paginated list of processes with optional filtering
+        and sorting
+      operationId: listProcesses
+      parameters:
+      - name: name
+        in: query
+        description: Filter by process name
+        schema:
+          type: string
+          nullable: true
+      - name: id
+        in: query
+        description: Filter by process ID
+        schema:
+          type: string
+          nullable: true
+      - name: status
+        in: query
+        description: Filter by process status
+        schema:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/ProcessStatus'
+      - name: deadlineStatus
+        in: query
+        description: Filter by deadline status
+        schema:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/DeadlineStatus'
+      - name: deadlineBefore
+        in: query
+        description: Filter processes with deadline before this timestamp
+        schema:
+          type: integer
+          format: int64
+          nullable: true
+      - name: deadlineAfter
+        in: query
+        description: Filter processes with deadline after this timestamp
+        schema:
+          type: integer
+          format: int64
+          nullable: true
+      - name: runningDurationMin
+        in: query
+        description: Filter processes running longer than this duration (minutes)
+        schema:
+          type: integer
+          format: int32
+          nullable: true
+      - name: sort_by
+        in: query
+        description: "Sort field and direction (e.g., 'started_at:desc')"
+        schema:
+          type: string
+          nullable: true
+      - name: limit
+        in: query
+        description: Maximum number of results (1-100)
+        schema:
+          maximum: 100
+          minimum: 1
+          type: integer
+          format: int32
+          nullable: true
+      - name: offset
+        in: query
+        description: Number of results to skip
+        schema:
+          minimum: 0
+          type: integer
+          format: int32
+          nullable: true
+      - name: tags
+        in: query
+        description: "Filter by tags (format: 'key1:value1,key2:value2')"
+        schema:
+          type: string
+          nullable: true
+      responses:
+        "200":
+          description: Successfully retrieved processes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResult_Object_'
+        "400":
+          description: Invalid query parameters
+  /processes/{name}:
+    post:
+      tags:
+      - Processes
+      summary: Create a new process
+      description: Create a new process with the specified name and configuration
+      operationId: createProcess
+      parameters:
+      - name: name
+        in: path
+        description: "Process name (alphanumeric, underscores, and hyphens only)"
+        required: true
+        schema:
+          maxLength: 100
+          minLength: 1
+          pattern: "^[a-zA-Z0-9_-]+$"
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewProcessRequest'
+        required: true
+      responses:
+        "201":
+          description: Process created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessResponse'
+        "400":
+          description: Invalid request data
+        "409":
+          description: Process with this name and ID already exists
+  /processes/{name}/{id}:
+    get:
+      tags:
+      - Processes
+      summary: Get a specific process
+      description: Retrieve details of a specific process by name and ID
+      operationId: getProcess
+      parameters:
+      - name: name
+        in: path
+        description: Process name
+        required: true
+        schema:
+          maxLength: 100
+          minLength: 1
+          pattern: "^[a-zA-Z0-9_-]+$"
+          type: string
+      - name: id
+        in: path
+        description: Process ID
+        required: true
+        schema:
+          maxLength: 50
+          minLength: 1
+          type: string
+      responses:
+        "200":
+          description: Process found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessResponse'
+        "404":
+          description: Process not found
+  /processes/{name}/{id}/complete:
+    put:
+      tags:
+      - Processes
+      summary: Complete a process
+      description: Mark a process as completed with optional status specification
+      operationId: completeProcess
+      parameters:
+      - name: name
+        in: path
+        description: Process name
+        required: true
+        schema:
+          maxLength: 100
+          minLength: 1
+          pattern: "^[a-zA-Z0-9_-]+$"
+          type: string
+      - name: id
+        in: path
+        description: Process ID
+        required: true
+        schema:
+          maxLength: 50
+          minLength: 1
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteProcessRequest'
+      responses:
+        "200":
+          description: Process completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessResponse'
+        "404":
+          description: Process not found
+        "400":
+          description: Invalid completion request
+  /swagger-ui:
+    get:
+      operationId: getSwaggerUi
+      responses:
+        "200":
+          description: getSwaggerUi 200 response
+          content:
+            application/json:
+              schema:
+                type: string
+components:
+  schemas:
+    CompleteProcessRequest:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/ProcessStatus'
+      description: Request DTO for completing a process.
+    DeadlineStatus:
+      type: string
+      description: Enumeration representing the deadline status of a process.
+      enum:
+      - ON_TRACK
+      - MISSED
+      - COMPLETED_ON_TIME
+      - COMPLETED_LATE
+    NewProcessRequest:
+      required:
+      - id
+      type: object
+      properties:
+        id:
+          maxLength: 50
+          minLength: 3
+          type: string
+        deadline:
+          minimum: 0
+          type: integer
+          format: int64
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessTag'
+        context:
+          type: object
+          additionalProperties: true
+      description: Request DTO for creating a new process.
+    PagedResult_Object_:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+        total:
+          type: integer
+          format: int64
+        limit:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int32
+        has_more:
+          type: boolean
+      description: Generic paged result wrapper for API responses.
+    ProcessResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProcessStatus'
+        deadline_status:
+          $ref: '#/components/schemas/DeadlineStatus'
+        started_at:
+          type: integer
+          format: int64
+        completed_at:
+          type: integer
+          format: int64
+        deadline:
+          type: integer
+          format: int64
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessTag'
+        context:
+          type: object
+          additionalProperties: true
+        duration:
+          type: integer
+          format: int64
+      description: Response DTO for process information.
+    ProcessStatus:
+      type: string
+      description: Enumeration representing the status of a process.
+      enum:
+      - ACTIVE
+      - COMPLETED
+      - FAILED
+    ProcessTag:
+      required:
+      - key
+      - value
+      type: object
+      properties:
+        key:
+          maxLength: 50
+          minLength: 1
+          type: string
+        value:
+          maxLength: 100
+          minLength: 1
+          type: string
+      description: Represents a tag associated with a process for categorization and
+        filtering.

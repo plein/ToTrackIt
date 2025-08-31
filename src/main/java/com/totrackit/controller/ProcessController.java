@@ -31,8 +31,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Controller("/processes")
 @Validated
+@Tag(name = "Processes", description = "Process tracking and management operations")
 public class ProcessController {
     
     private static final Logger LOG = LoggerFactory.getLogger(ProcessController.class);
@@ -45,18 +54,33 @@ public class ProcessController {
     }
     
     @Get("/")
+    @Operation(
+        summary = "List processes",
+        description = "Retrieve a paginated list of processes with optional filtering and sorting"
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "Successfully retrieved processes",
+            content = @Content(schema = @Schema(implementation = PagedResult.class))
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "Invalid query parameters"
+        )
+    })
     public HttpResponse<PagedResult<ProcessResponse>> listProcesses(
-            @QueryValue @Nullable String name,
-            @QueryValue @Nullable String id,
-            @QueryValue @Nullable ProcessStatus status,
-            @QueryValue @Nullable DeadlineStatus deadlineStatus,
-            @QueryValue @Nullable Long deadlineBefore,
-            @QueryValue @Nullable Long deadlineAfter,
-            @QueryValue @Nullable Integer runningDurationMin,
-            @QueryValue("sort_by") @Nullable String sortBy,
-            @QueryValue @Nullable @Min(1) @Max(100) Integer limit,
-            @QueryValue @Nullable @Min(0) Integer offset,
-            @QueryValue("tags") @Nullable String tags) {
+            @Parameter(description = "Filter by process name") @QueryValue @Nullable String name,
+            @Parameter(description = "Filter by process ID") @QueryValue @Nullable String id,
+            @Parameter(description = "Filter by process status") @QueryValue @Nullable ProcessStatus status,
+            @Parameter(description = "Filter by deadline status") @QueryValue @Nullable DeadlineStatus deadlineStatus,
+            @Parameter(description = "Filter processes with deadline before this timestamp") @QueryValue @Nullable Long deadlineBefore,
+            @Parameter(description = "Filter processes with deadline after this timestamp") @QueryValue @Nullable Long deadlineAfter,
+            @Parameter(description = "Filter processes running longer than this duration (minutes)") @QueryValue @Nullable Integer runningDurationMin,
+            @Parameter(description = "Sort field and direction (e.g., 'started_at:desc')") @QueryValue("sort_by") @Nullable String sortBy,
+            @Parameter(description = "Maximum number of results (1-100)") @QueryValue @Nullable @Min(1) @Max(100) Integer limit,
+            @Parameter(description = "Number of results to skip") @QueryValue @Nullable @Min(0) Integer offset,
+            @Parameter(description = "Filter by tags (format: 'key1:value1,key2:value2')") @QueryValue("tags") @Nullable String tags) {
         
         LOG.info("Listing processes with filters: name={}, id={}, status={}, deadlineStatus={}, tags={}, limit={}, offset={}", 
                 name, id, status, deadlineStatus, tags, limit, offset);
@@ -99,13 +123,34 @@ public class ProcessController {
     }
     
     @Post("/{name}")
+    @Operation(
+        summary = "Create a new process",
+        description = "Create a new process with the specified name and configuration"
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "201",
+            description = "Process created successfully",
+            content = @Content(schema = @Schema(implementation = ProcessResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "Invalid request data"
+        ),
+        @ApiResponse(
+            responseCode = "409",
+            description = "Process with this name and ID already exists"
+        )
+    })
     public HttpResponse<ProcessResponse> createProcess(
+            @Parameter(description = "Process name (alphanumeric, underscores, and hyphens only)")
             @PathVariable 
             @NotBlank(message = "Process name is required")
             @Size(min = 1, max = 100, message = "Process name must be between 1 and 100 characters")
             @Pattern(regexp = "^[a-zA-Z0-9_-]+$", message = "Process name can only contain letters, numbers, underscores, and hyphens")
             String name,
             
+            @Parameter(description = "Process creation details")
             @Body 
             @Valid 
             NewProcessRequest request) {
@@ -126,13 +171,30 @@ public class ProcessController {
     }
     
     @Get("/{name}/{id}")
+    @Operation(
+        summary = "Get a specific process",
+        description = "Retrieve details of a specific process by name and ID"
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "Process found",
+            content = @Content(schema = @Schema(implementation = ProcessResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "404",
+            description = "Process not found"
+        )
+    })
     public HttpResponse<ProcessResponse> getProcess(
+            @Parameter(description = "Process name")
             @PathVariable 
             @NotBlank(message = "Process name is required")
             @Size(min = 1, max = 100, message = "Process name must be between 1 and 100 characters")
             @Pattern(regexp = "^[a-zA-Z0-9_-]+$", message = "Process name can only contain letters, numbers, underscores, and hyphens")
             String name,
             
+            @Parameter(description = "Process ID")
             @PathVariable("id")
             @NotBlank(message = "Process ID is required")
             @Size(min = 1, max = 50, message = "Process ID must be between 1 and 50 characters")
@@ -155,18 +217,40 @@ public class ProcessController {
     }
     
     @Put("/{name}/{id}/complete")
+    @Operation(
+        summary = "Complete a process",
+        description = "Mark a process as completed with optional status specification"
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "Process completed successfully",
+            content = @Content(schema = @Schema(implementation = ProcessResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "404",
+            description = "Process not found"
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "Invalid completion request"
+        )
+    })
     public HttpResponse<ProcessResponse> completeProcess(
+            @Parameter(description = "Process name")
             @PathVariable 
             @NotBlank(message = "Process name is required")
             @Size(min = 1, max = 100, message = "Process name must be between 1 and 100 characters")
             @Pattern(regexp = "^[a-zA-Z0-9_-]+$", message = "Process name can only contain letters, numbers, underscores, and hyphens")
             String name,
             
+            @Parameter(description = "Process ID")
             @PathVariable("id")
             @NotBlank(message = "Process ID is required")
             @Size(min = 1, max = 50, message = "Process ID must be between 1 and 50 characters")
             String processId,
             
+            @Parameter(description = "Completion details (optional, defaults to COMPLETED status)")
             @Body 
             @Nullable
             @Valid 
