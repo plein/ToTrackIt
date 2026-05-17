@@ -2,7 +2,7 @@ type IconName =
   | 'search' | 'plus' | 'x' | 'chevron_right' | 'chevron_down' | 'arrow_right'
   | 'activity' | 'check' | 'alert' | 'fail' | 'clock' | 'filter' | 'sort'
   | 'list' | 'grid' | 'book' | 'settings' | 'bell' | 'play' | 'refresh'
-  | 'copy' | 'chart' | 'tag' | 'layers' | 'folder'
+  | 'copy' | 'chart' | 'tag' | 'layers' | 'folder' | 'trash'
 
 const PATHS: Record<IconName, React.ReactNode> = {
   search: <><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4 4" /></>,
@@ -30,6 +30,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   tag: <><path d="M20.6 13.4 12.4 21.6a2 2 0 0 1-2.8 0L2.4 14.4a2 2 0 0 1 0-2.8L11.6 2.4a2 2 0 0 1 1.4-.6h6.6A2 2 0 0 1 21.6 4v6.6a2 2 0 0 1-1 1.7z" /><circle cx="16" cy="8" r="1.5" /></>,
   layers: <><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" /></>,
   folder: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
+  trash: <><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></>,
 }
 
 interface IconProps {

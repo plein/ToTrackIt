@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { ProcessResponse } from '@/types'
 import { fmtRelative, fmtDuration, fmtAbsolute } from '@/lib/format'
+import { useDeleteProcess } from '@/hooks/useProcesses'
 import { Icon } from './Icon'
 import { Button } from './Button'
 import { StatusPill } from './StatusPill'
@@ -130,21 +131,29 @@ interface DetailPanelProps {
   onClose: () => void
   onComplete: (proc: ProcessResponse, status: 'COMPLETED' | 'FAILED') => void
   onOpenOther: (proc: ProcessResponse) => void
+  onDelete?: (proc: ProcessResponse) => void
 }
 
-export function DetailPanel({ proc, allProcesses, onClose, onComplete, onOpenOther }: DetailPanelProps) {
+export function DetailPanel({ proc, allProcesses, onClose, onComplete, onOpenOther, onDelete }: DetailPanelProps) {
   const [tab, setTab] = useState<'timeline' | 'context' | 'tags' | 'related'>('timeline')
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [, forceUpdate] = useState(0)
   const n = now() // re-evaluated fresh on every render
+  const deleteMut = useDeleteProcess()
 
   useEffect(() => { setTab('timeline') }, [proc?.id, proc?.name])
 
-  // Escape to close
+  // Escape to close (or cancel confirm)
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (confirmDelete) setConfirmDelete(false)
+        else onClose()
+      }
+    }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [onClose])
+  }, [onClose, confirmDelete])
 
   // 1-second tick so "Running for X" stays live for ACTIVE processes
   useEffect(() => {
@@ -152,6 +161,15 @@ export function DetailPanel({ proc, allProcesses, onClose, onComplete, onOpenOth
     const id = setInterval(() => forceUpdate((c) => c + 1), 1000)
     return () => clearInterval(id)
   }, [proc?.status])
+
+  const handleDelete = useCallback(() => {
+    deleteMut.mutate(
+      { name: proc.name, id: proc.id },
+      {
+        onSuccess: () => { onDelete?.(proc); onClose() },
+      }
+    )
+  }, [deleteMut, proc, onDelete, onClose])
 
   const tabs = [
     { id: 'timeline' as const, label: 'Timeline' },
@@ -172,7 +190,7 @@ export function DetailPanel({ proc, allProcesses, onClose, onComplete, onOpenOth
             <span className="tti-detail__breadcrumb-id">{proc.id}</span>
           </div>
           <div className="tti-detail__actions">
-            {proc.status === 'ACTIVE' && (
+            {proc.status === 'ACTIVE' && !confirmDelete && (
               <>
                 <Button size="sm" variant="primary" icon="check" onClick={() => onComplete(proc, 'COMPLETED')}>
                   Complete
@@ -181,6 +199,19 @@ export function DetailPanel({ proc, allProcesses, onClose, onComplete, onOpenOth
                   Fail
                 </Button>
               </>
+            )}
+            {confirmDelete ? (
+              <>
+                <span style={{ fontSize: '12px', color: 'var(--text-2)' }}>Delete this run?</span>
+                <Button size="sm" variant="danger" onClick={handleDelete} disabled={deleteMut.isPending}>
+                  {deleteMut.isPending ? 'Deleting…' : 'Confirm'}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+              </>
+            ) : (
+              <button type="button" className="tti-icon-btn" onClick={() => setConfirmDelete(true)} title="Delete process">
+                <Icon name="trash" size={15} />
+              </button>
             )}
             <button type="button" className="tti-icon-btn" onClick={onClose} title="Close">
               <Icon name="x" size={16} />

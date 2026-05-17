@@ -16,6 +16,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Put;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.validation.Validated;
@@ -276,6 +277,29 @@ public class ProcessController {
         }
     }
     
+    @Delete("/{name}/{id}")
+    @Operation(
+        summary = "Delete a process",
+        description = "Permanently delete a process record by name and ID"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Process deleted successfully"),
+        @ApiResponse(responseCode = "404", description = "Process not found")
+    })
+    public HttpResponse<Void> deleteProcess(
+            @Parameter(description = "Process name") @PathVariable
+            @NotBlank @Size(min = 1, max = 100) @Pattern(regexp = "^[a-zA-Z0-9_-]+$")
+            String name,
+
+            @Parameter(description = "Process ID") @PathVariable("id")
+            @NotBlank @Size(min = 1, max = 50)
+            String processId) {
+
+        LOG.info("Deleting process: name='{}', id='{}'", name, processId);
+        processService.deleteProcess(name, processId);
+        return HttpResponse.noContent();
+    }
+
     /**
      * Parses the sort_by parameter and sets the appropriate sort fields in the filter.
      * Format: "field1:asc,field2:desc" or just "field1,field2" (defaults to asc)

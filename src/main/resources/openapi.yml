@@ -276,6 +276,35 @@ paths:
                 $ref: '#/components/schemas/ProcessResponse'
         "404":
           description: Process not found
+    delete:
+      tags:
+      - Processes
+      summary: Delete a process
+      description: Permanently delete a process record by name and ID
+      operationId: deleteProcess
+      parameters:
+      - name: name
+        in: path
+        description: Process name
+        required: true
+        schema:
+          maxLength: 100
+          minLength: 1
+          pattern: "^[a-zA-Z0-9_-]+$"
+          type: string
+      - name: id
+        in: path
+        description: Process ID
+        required: true
+        schema:
+          maxLength: 50
+          minLength: 1
+          type: string
+      responses:
+        "204":
+          description: Process deleted successfully
+        "404":
+          description: Process not found
   /processes/{name}/{id}/complete:
     put:
       tags:

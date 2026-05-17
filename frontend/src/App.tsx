@@ -204,6 +204,7 @@ export default function App() {
           onClose={() => setOpenProc(null)}
           onComplete={handleComplete}
           onOpenOther={setOpenProc}
+          onDelete={(proc) => flash(`Deleted ${proc.id}`, 'neutral')}
         />
       )}
 

@@ -180,6 +180,23 @@ public class ProcessService {
     }
     
     /**
+     * Deletes a process by name and process ID.
+     *
+     * @param name the process name
+     * @param processId the process ID
+     * @throws ProcessNotFoundException if the process is not found
+     */
+    @Transactional
+    public void deleteProcess(String name, String processId) {
+        LOG.debug("Deleting process: name='{}', id='{}'", name, processId);
+        ProcessEntity entity = processRepository.findByNameAndProcessId(name, processId)
+                .orElseThrow(() -> new ProcessNotFoundException(name, processId));
+        processRepository.delete(entity);
+        metricsService.recordDatabaseOperation("delete", "processes", true);
+        LOG.info("Deleted process: name='{}', id='{}'", name, processId);
+    }
+
+    /**
      * Lists processes with optional filtering and pagination.
      * Supports filtering by status, deadline status, tags, and other criteria.
      * 

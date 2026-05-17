@@ -76,6 +76,22 @@ export async function createProcess(name: string, body: NewProcessRequest): Prom
   return normalize(p)
 }
 
+export async function deleteProcess(name: string, id: string): Promise<void> {
+  const res = await fetch(
+    `/processes/${encodeURIComponent(name)}/${encodeURIComponent(id)}`,
+    { method: 'DELETE', headers: { 'Content-Type': 'application/json' } },
+  )
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw {
+      error: 'DELETE_FAILED',
+      message: extractMessage(body),
+      timestamp: Math.floor(Date.now() / 1000),
+      path: `/processes/${name}/${id}`,
+    }
+  }
+}
+
 export async function completeProcess(
   name: string,
   id: string,

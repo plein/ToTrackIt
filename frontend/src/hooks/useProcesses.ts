@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { listProcesses, createProcess, completeProcess } from '@/api/processes'
+import { listProcesses, createProcess, completeProcess, deleteProcess } from '@/api/processes'
 import type { ProcessFilter, ProcessResponse, NewProcessRequest, CompleteProcessRequest } from '@/types'
 
 const PAGE_SIZE = 100
@@ -45,6 +45,14 @@ export function useCompleteProcess() {
       id: string
       body: CompleteProcessRequest
     }) => completeProcess(name, id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['processes'] }),
+  })
+}
+
+export function useDeleteProcess() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ name, id }: { name: string; id: string }) => deleteProcess(name, id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['processes'] }),
   })
 }
