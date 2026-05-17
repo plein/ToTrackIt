@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Icon } from './Icon'
 import { Button } from './Button'
 
@@ -17,6 +17,12 @@ interface CreateProcessModalProps {
 }
 
 export function CreateProcessModal({ onClose, onCreate, suggestedNames }: CreateProcessModalProps) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
   const [name, setName] = useState('')
   const [id, setId] = useState('')
   const [deadlineMins, setDeadlineMins] = useState(60)

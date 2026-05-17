@@ -63,7 +63,7 @@ export default function App() {
     document.documentElement.dataset.theme = theme
   }, [theme])
 
-  const { data: allProcesses = [], isLoading, isError, refetch } = useProcessList()
+  const { data: allProcesses = [], isLoading, isFetching, isError, refetch } = useProcessList()
 
   const filteredByNav = useMemo(() => {
     switch (activeNav) {
@@ -105,7 +105,7 @@ export default function App() {
       { name: createData.name, body: { id: createData.id, deadline, tags: createData.tags, context: createData.context } },
       {
         onSuccess: (proc) => { setShowCreate(false); flash(`Registered ${createData.id}`, 'green'); setOpenProc(proc) },
-        onError: () => flash('Failed to create process', 'red'),
+        onError: (err: unknown) => flash((err as { message?: string })?.message ?? 'Failed to create process', 'red'),
       }
     )
   }, [createMut, flash])
@@ -118,7 +118,7 @@ export default function App() {
           if (openProc?.id === proc.id && openProc?.name === proc.name) setOpenProc(updated)
           flash(`Marked ${proc.id} as ${status.toLowerCase()}`, status === 'FAILED' ? 'red' : 'green')
         },
-        onError: () => flash('Failed to update process', 'red'),
+        onError: (err: unknown) => flash((err as { message?: string })?.message ?? 'Failed to update process', 'red'),
       }
     )
   }, [completeMut, openProc, flash])
@@ -192,6 +192,7 @@ export default function App() {
             initialTagFilter={tagJump}
             navKey={activeNav + (nameJump || '') + (tagJump ? `${tagJump.key}:${tagJump.value}` : '')}
             onRefresh={refetch}
+            isFetching={isFetching}
           />
         )}
       </main>

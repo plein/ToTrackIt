@@ -34,6 +34,31 @@ docker-compose up --build
 docker-compose -f docker-compose.prod.yml -f docker-compose.monitoring.yml up -d
 ```
 
+### Frontend (`frontend/`)
+
+```bash
+# Install dependencies
+cd frontend && npm install
+
+# Dev server (http://localhost:5173, proxies /processes and /health to localhost:8080)
+npm run dev
+
+# Type-check + production build
+npm run build
+
+# Lint
+npm run lint
+```
+
+The frontend is a Vite + React + TypeScript app. It uses the custom `tti-*` CSS design system (no Tailwind). All API calls go through the Vite dev proxy; in production, nginx handles the proxy (see `nginx.conf`).
+
+Key source layout:
+- `src/api/processes.ts` — fetch wrappers with response normalization
+- `src/hooks/useProcesses.ts` — TanStack Query hooks (auto-paginates up to backend's 100-per-page cap)
+- `src/components/` — shared atoms (Icon, StatusPill, TagChip, DeadlineBar, Button, Sidebar, DetailPanel, CreateProcessModal, Toast, Wordmark)
+- `src/pages/` — Dashboard, NameRollups, Tags, Metrics
+- `src/lib/format.ts` — `fmtRelative`, `fmtDuration`, `fmtAbsolute` (all timestamps are Unix seconds)
+
 ## Environment Setup
 
 Copy `.env.example` to `.env` before running Docker Compose. Key variables:

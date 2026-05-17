@@ -112,6 +112,7 @@ interface DashboardProps {
   initialTagFilter?: { key: string; value: string } | null
   navKey?: string
   onRefresh?: () => void
+  isFetching?: boolean
 }
 
 export function Dashboard({
@@ -124,6 +125,7 @@ export function Dashboard({
   initialTagFilter,
   navKey,
   onRefresh,
+  isFetching = false,
 }: DashboardProps) {
   const n = now()
   const [search, setSearch] = useState('')
@@ -251,7 +253,9 @@ export function Dashboard({
           </div>
         </div>
         <div className="tti-page-header__actions">
-          <Button variant="ghost" icon="refresh" onClick={onRefresh}>Refresh</Button>
+          <Button variant="ghost" icon="refresh" onClick={onRefresh} disabled={isFetching} style={isFetching ? { opacity: 0.6 } : undefined}>
+            {isFetching ? 'Refreshing…' : 'Refresh'}
+          </Button>
           <Button variant="primary" icon="plus" onClick={onOpenCreate}>New process</Button>
         </div>
       </div>

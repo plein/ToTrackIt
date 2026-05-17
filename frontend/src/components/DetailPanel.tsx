@@ -134,9 +134,24 @@ interface DetailPanelProps {
 
 export function DetailPanel({ proc, allProcesses, onClose, onComplete, onOpenOther }: DetailPanelProps) {
   const [tab, setTab] = useState<'timeline' | 'context' | 'tags' | 'related'>('timeline')
-  const n = now()
+  const [, forceUpdate] = useState(0)
+  const n = now() // re-evaluated fresh on every render
 
   useEffect(() => { setTab('timeline') }, [proc?.id, proc?.name])
+
+  // Escape to close
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  // 1-second tick so "Running for X" stays live for ACTIVE processes
+  useEffect(() => {
+    if (proc?.status !== 'ACTIVE') return
+    const id = setInterval(() => forceUpdate((c) => c + 1), 1000)
+    return () => clearInterval(id)
+  }, [proc?.status])
 
   const tabs = [
     { id: 'timeline' as const, label: 'Timeline' },

@@ -7,13 +7,36 @@ import type {
   ApiError,
 } from '@/types'
 
+function extractMessage(body: unknown): string {
+  if (!body || typeof body !== 'object') return 'Unknown error'
+  const b = body as Record<string, unknown>
+  // Custom ErrorResponse: { error, message, ... }
+  if (typeof b.message === 'string' && b.error) return b.message
+  // Micronaut HATEOAS default: { _embedded: { errors: [{ message }] }, message }
+  const embedded = b._embedded as Record<string, unknown> | undefined
+  if (Array.isArray(embedded?.errors)) {
+    const first = (embedded!.errors as Record<string, unknown>[])[0]
+    if (typeof first?.message === 'string') return first.message
+  }
+  if (typeof b.message === 'string') return b.message
+  return 'Request failed'
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   })
   const body = await res.json()
-  if (!res.ok) throw body as ApiError
+  if (!res.ok) {
+    const err: ApiError = {
+      error: (body as Record<string, unknown>)?.error as string ?? 'ERROR',
+      message: extractMessage(body),
+      timestamp: Math.floor(Date.now() / 1000),
+      path,
+    }
+    throw err
+  }
   return body as T
 }
 
