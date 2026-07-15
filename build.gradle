@@ -70,6 +70,14 @@ java {
     targetCompatibility = JavaVersion.toVersion("21")
 }
 
+test {
+    useJUnitPlatform()
+    // One JVM per test class: each @MicronautTest context gets a fresh in-memory
+    // H2 database, preventing cross-class interference through the shared testdb.
+    forkEvery = 1
+    maxParallelForks = Math.max(1, (int) (Runtime.runtime.availableProcessors() / 2))
+}
+
 micronaut {
     runtime("netty")
     testRuntime("junit5")

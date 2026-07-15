@@ -37,7 +37,9 @@ public class MetricsIntegrationTest {
         
         assertEquals(HttpStatus.OK, response.getStatus());
         assertNotNull(response.body());
-        assertTrue(response.body().contains("# HELP"));
+        // Micronaut's /metrics endpoint returns JSON with a "names" list;
+        // Prometheus-format text lives at /prometheus.
+        assertTrue(response.body().contains("names"));
     }
 
     @Test

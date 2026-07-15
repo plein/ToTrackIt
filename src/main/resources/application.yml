@@ -53,8 +53,12 @@ endpoints:
     enabled: true
   metrics:
     enabled: true
+    sensitive: false
   prometheus:
     enabled: true
+    # Not sensitive so Prometheus can scrape without auth; ToTrackIt runs inside
+    # a trusted network (see README Security section).
+    sensitive: false
 
 micronaut:
   metrics:

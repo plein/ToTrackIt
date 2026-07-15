@@ -42,8 +42,10 @@ endpoints:
     enabled: true
   metrics:
     enabled: true
+    sensitive: false
   prometheus:
     enabled: true
+    sensitive: false
 
 logger:
   levels:

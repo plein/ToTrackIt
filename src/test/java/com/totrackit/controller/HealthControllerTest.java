@@ -27,7 +27,7 @@ class HealthControllerTest {
     @Test
     @DisplayName("Health endpoint should return application status")
     void testHealthEndpoint() {
-        HttpRequest<Object> request = HttpRequest.GET("/health");
+        HttpRequest<Object> request = HttpRequest.GET("/health/status");
         HttpResponse<Map> response = client.toBlocking().exchange(request, Map.class);
 
         assertEquals(HttpStatus.OK, response.getStatus());
@@ -89,7 +89,7 @@ class HealthControllerTest {
     @Test
     @DisplayName("Health endpoint should include database health details")
     void testHealthEndpointDatabaseDetails() {
-        HttpRequest<Object> request = HttpRequest.GET("/health");
+        HttpRequest<Object> request = HttpRequest.GET("/health/status");
         HttpResponse<Map> response = client.toBlocking().exchange(request, Map.class);
 
         Map<String, Object> body = response.body();
@@ -110,7 +110,7 @@ class HealthControllerTest {
     @Test
     @DisplayName("Health endpoint should include application health details")
     void testHealthEndpointApplicationDetails() {
-        HttpRequest<Object> request = HttpRequest.GET("/health");
+        HttpRequest<Object> request = HttpRequest.GET("/health/status");
         HttpResponse<Map> response = client.toBlocking().exchange(request, Map.class);
 
         Map<String, Object> body = response.body();

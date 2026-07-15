@@ -50,7 +50,7 @@ class HealthControllerIntegrationTest implements TestPropertyProvider {
     @Test
     @DisplayName("Health endpoint should work with real database")
     void testHealthEndpointWithDatabase() {
-        HttpRequest<Object> request = HttpRequest.GET("/health");
+        HttpRequest<Object> request = HttpRequest.GET("/health/status");
         HttpResponse<Map> response = client.toBlocking().exchange(request, Map.class);
 
         assertEquals(HttpStatus.OK, response.getStatus());
@@ -129,7 +129,7 @@ class HealthControllerIntegrationTest implements TestPropertyProvider {
     @Test
     @DisplayName("Health endpoint should include connection pool information")
     void testHealthEndpointConnectionPoolInfo() {
-        HttpRequest<Object> request = HttpRequest.GET("/health");
+        HttpRequest<Object> request = HttpRequest.GET("/health/status");
         HttpResponse<Map> response = client.toBlocking().exchange(request, Map.class);
 
         Map<String, Object> body = response.body();

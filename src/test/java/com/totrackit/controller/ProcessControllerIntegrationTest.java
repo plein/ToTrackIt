@@ -90,7 +90,8 @@ public class ProcessControllerIntegrationTest {
     
     @Test
     public void testCreateProcess_ValidationError_EmptyProcessName() {
-        // Given - empty process name (results in 404 because path doesn't match)
+        // Given - empty process name: POST /processes/ matches the listing route
+        // (GET only), so the router answers 405 Method Not Allowed
         String processName = "";
         NewProcessRequest request = new NewProcessRequest("valid-id");
         
@@ -100,10 +101,10 @@ public class ProcessControllerIntegrationTest {
         HttpClientResponseException exception = assertThrows(HttpClientResponseException.class, () -> {
             client.toBlocking().exchange(httpRequest, String.class);
         });
-        
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+
+        assertEquals(HttpStatus.METHOD_NOT_ALLOWED, exception.getStatus());
     }
-    
+
     @Test
     public void testCreateProcess_ValidationError_LongProcessName() {
         // Given - process name too long
