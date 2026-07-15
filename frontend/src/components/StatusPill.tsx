@@ -1,4 +1,5 @@
 import type { ProcessStatus, DeadlineStatus } from '@/types'
+import { STATUS_TONE } from '@/lib/statusTone'
 
 type StatusValue = ProcessStatus | DeadlineStatus | string
 
@@ -10,16 +11,6 @@ const STATUS_LABEL: Record<string, string> = {
   MISSED: 'Missed',
   COMPLETED_ON_TIME: 'On time',
   COMPLETED_LATE: 'Late',
-}
-
-export const STATUS_TONE: Record<string, string> = {
-  ACTIVE: 'blue',
-  COMPLETED: 'green',
-  FAILED: 'red',
-  ON_TRACK: 'green',
-  MISSED: 'red',
-  COMPLETED_ON_TIME: 'green',
-  COMPLETED_LATE: 'amber',
 }
 
 interface StatusDotProps {

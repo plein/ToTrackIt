@@ -8,6 +8,8 @@ import { Icon } from '@/components/Icon'
 import { StatusPill } from '@/components/StatusPill'
 import { fmtRelative } from '@/lib/format'
 
+const now = () => Math.floor(Date.now() / 1000)
+
 const STATUS_COLORS = { ACTIVE: 'oklch(0.55 0.15 250)', COMPLETED: 'oklch(0.55 0.15 145)', FAILED: 'oklch(0.55 0.2 25)' }
 const DEADLINE_COLORS: Record<string, string> = {
   ON_TRACK: 'oklch(0.55 0.15 145)',
@@ -67,7 +69,7 @@ export function Metrics() {
   const { data, isFetching, refetch } = useAllProcesses()
   const processes = data ?? []
   const { statusCounts, deadlineCounts, missedCount, completedLast24h, completionRate } = aggregate(processes)
-  const n = Math.floor(Date.now() / 1000)
+  const n = now()
 
   const statusData = Object.entries(statusCounts)
     .filter(([, v]) => v > 0)

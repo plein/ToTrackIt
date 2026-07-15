@@ -3,7 +3,8 @@ import type { ProcessResponse, ProcessTag } from '@/types'
 import { fmtRelative, fmtDuration } from '@/lib/format'
 import { Icon } from '@/components/Icon'
 import { Button } from '@/components/Button'
-import { StatusPill, STATUS_TONE } from '@/components/StatusPill'
+import { StatusPill } from '@/components/StatusPill'
+import { STATUS_TONE } from '@/lib/statusTone'
 import { TagChip } from '@/components/TagChip'
 import { DeadlineBar } from '@/components/DeadlineBar'
 
@@ -136,13 +137,18 @@ export function Dashboard({
   const [sortField, setSortField] = useState<keyof ProcessResponse>('started_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
-  useEffect(() => {
+  // Reset filters when navigation changes; render-phase state adjustment
+  // instead of an effect (see React docs on resetting state when a prop changes)
+  const resetKey = `${navKey}|${initialNameFilter ?? ''}|${initialTagFilter ? `${initialTagFilter.key}=${initialTagFilter.value}` : ''}`
+  const [prevResetKey, setPrevResetKey] = useState(resetKey)
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey)
     setNameFilter(initialNameFilter || 'all')
     setStatusFilter('all')
     setDeadlineFilter('all')
     setActiveTags(initialTagFilter ? [initialTagFilter] : [])
     setSearch('')
-  }, [navKey, initialNameFilter, initialTagFilter])
+  }
 
   const stats = useMemo(() => {
     const active = processes.filter((p) => p.status === 'ACTIVE').length

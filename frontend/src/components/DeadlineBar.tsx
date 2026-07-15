@@ -1,5 +1,5 @@
 import type { ProcessResponse } from '@/types'
-import { STATUS_TONE } from './StatusPill'
+import { STATUS_TONE } from '@/lib/statusTone'
 
 interface DeadlineBarProps {
   proc: ProcessResponse

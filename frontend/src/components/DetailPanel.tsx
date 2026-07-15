@@ -141,7 +141,15 @@ export function DetailPanel({ proc, allProcesses, onClose, onComplete, onOpenOth
   const n = now() // re-evaluated fresh on every render
   const deleteMut = useDeleteProcess()
 
-  useEffect(() => { setTab('timeline') }, [proc?.id, proc?.name])
+  // Reset to the timeline tab when a different process is shown; render-phase
+  // state adjustment instead of an effect (see React docs on resetting state
+  // when a prop changes)
+  const procKey = proc ? `${proc.name}/${proc.id}` : undefined
+  const [prevProcKey, setPrevProcKey] = useState(procKey)
+  if (procKey !== prevProcKey) {
+    setPrevProcKey(procKey)
+    setTab('timeline')
+  }
 
   // Escape to close (or cancel confirm)
   useEffect(() => {

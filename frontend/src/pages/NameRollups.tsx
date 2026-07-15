@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import type { ProcessResponse } from '@/types'
 import { fmtRelative, fmtDuration } from '@/lib/format'
 import { Icon } from '@/components/Icon'
-import { StatusPill, STATUS_TONE } from '@/components/StatusPill'
+import { StatusPill } from '@/components/StatusPill'
+import { STATUS_TONE } from '@/lib/statusTone'
 
 const now = () => Math.floor(Date.now() / 1000)
 
