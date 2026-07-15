@@ -173,16 +173,6 @@ MICRONAUT_ENVIRONMENTS=docker ./gradlew run
 MICRONAUT_ENVIRONMENTS=local ./gradlew run
 ```
 
-### Testing Docker Setup
-
-```bash
-# Validate Docker configuration
-./validate-docker-setup.sh
-
-# Full environment test (requires Docker)
-./docker/test-environment.sh
-```
-
 ---
 
 ## 📖 API Overview
