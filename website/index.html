@@ -13,7 +13,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Open-source deadline tracking and root-cause analytics for async business processes. Track account activations, payments, and KYC against SLOs, alert via Datadog or Prometheus, and diagnose incidents by tag — country, channel, provider. Self-hosted with Docker.">
-    <title>ToTrackIt - Deadline Tracking & Root-Cause Analytics for Async Processes</title>
+    <title>ToTrackIt — Deadline Tracking & Root-Cause Analytics for Async Processes</title>
 
     <link rel="canonical" href="https://totrackit.com/">
 
@@ -27,7 +27,10 @@
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="ToTrackIt — Know when async processes miss their SLO, and why">
     <meta name="twitter:description" content="Open-source deadline tracking and root-cause analytics for async business processes. Feeds Datadog/Prometheus SLO monitors; diagnoses incidents by tag. Self-hosted.">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link href="css/style.css" rel="stylesheet">
 
     <link rel="icon" type="image/png" href="images/favicon/favicon-96x96.png" sizes="96x96" />
@@ -35,113 +38,218 @@
     <link rel="shortcut icon" href="images/favicon/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="images/favicon/apple-touch-icon.png" />
     <link rel="manifest" href="images/favicon/site.webmanifest" />
-
-
 </head>
 <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+
+    <header class="nav">
+        <div class="container nav__inner">
+            <a class="nav__brand" href="/">
+                <img src="images/favicon/favicon.svg" alt="" width="22" height="22">
+                <span>ToTrackIt</span>
+            </a>
+            <nav class="nav__links" aria-label="Main">
+                <a href="#how">How it works</a>
+                <a href="#metrics">Metrics</a>
+                <a href="#features">Features</a>
+                <a class="btn btn--ghost btn--sm" href="https://github.com/plein/ToTrackIt" target="_blank" rel="noopener">GitHub ↗</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="container hero__grid">
+            <div class="hero__copy">
+                <p class="eyebrow">Open source · Apache 2.0 · Self-hosted</p>
+                <h1>Know when async processes miss their SLO.<br><em>And why.</em></h1>
+                <p class="hero__sub">
+                    Account activations, payments, KYC checks — when they get stuck, customers
+                    notice first. ToTrackIt tracks every run against its deadline, alerts through
+                    the stack you already page on, and shows which country, channel, or provider
+                    the problem is hiding in.
+                </p>
+                <div class="hero__cta">
+                    <a class="btn btn--primary" href="https://github.com/plein/ToTrackIt" target="_blank" rel="noopener">View on GitHub</a>
+                    <code class="cmd" title="Full stack: API, UI, PostgreSQL">docker compose up -d</code>
+                </div>
+                <p class="hero__note">The pager stays yours — Datadog, Prometheus, Grafana. ToTrackIt is where the alert lands.</p>
+            </div>
+
+            <!-- Signature: CSS-only incident replay -->
+            <div class="incident" aria-label="Example: a missed deadline being diagnosed by tag">
+                <div class="incident__head">
+                    <span class="incident__name">account-activation</span>
+                    <span class="incident__slo">SLO 1h</span>
+                </div>
+                <div class="incident__run">
+                    <div class="incident__run-meta">
+                        <span class="mono">act-9f27</span>
+                        <span class="chip">country:DE</span>
+                        <span class="chip">kyc:provider-x</span>
+                    </div>
+                    <div class="meter">
+                        <div class="meter__fill"></div>
+                    </div>
+                    <span class="pill">
+                        <span class="pill__ontrack">ON TRACK</span>
+                        <span class="pill__missed">MISSED</span>
+                    </span>
+                </div>
+                <div class="incident__divider reveal r1">
+                    <span>Impacted tags · last 1h</span>
+                </div>
+                <div class="diag reveal r2">
+                    <span class="chip chip--hot">country:DE</span>
+                    <div class="diag__bar"><div class="diag__fill diag__fill--red w92"></div></div>
+                    <span class="diag__count diag__count--red">14 overdue</span>
+                </div>
+                <div class="diag reveal r3">
+                    <span class="chip chip--warm">kyc:provider-x</span>
+                    <div class="diag__bar"><div class="diag__fill diag__fill--amber w61"></div></div>
+                    <span class="diag__count diag__count--amber">9 late</span>
+                </div>
+                <div class="diag reveal r4">
+                    <span class="chip">country:FR</span>
+                    <div class="diag__bar"><div class="diag__fill w8"></div></div>
+                    <span class="diag__count">0 problems</span>
+                </div>
+                <div class="incident__foot reveal r4">
+                    <span class="mono">p90 latency — DE 78m · FR 9m</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How it works: a real sequence -->
+    <section class="section" id="how">
         <div class="container">
-            <a class="navbar-brand" href="#">ToTrackIt</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="#features">Features</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#opensource">Open Source</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#contact">Contact</a></li>
-                    <li class="nav-item"><a class="nav-link" href="https://github.com/plein/ToTrackIt" target="_blank">GitHub</a></li>
+            <p class="eyebrow">How it works</p>
+            <h2>Two API calls in. Your alerting out.</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="step__n">1</div>
+                    <h3>Instrument the process</h3>
+                    <p>Start each run with a deadline and business tags. Complete it when it finishes. That's the whole integration.</p>
+                    <pre class="code"><code><span class="c-verb">POST</span> /processes/account-activation
+{ <span class="c-key">"id"</span>: <span class="c-str">"act-9f27"</span>,
+  <span class="c-key">"deadline"</span>: <span class="c-str">now + 1h</span>,
+  <span class="c-key">"tags"</span>: [<span class="c-str">country:DE</span>, <span class="c-str">kyc:provider-x</span>] }
+
+<span class="c-verb">PUT</span> /processes/…/act-9f27/complete</code></pre>
+                </div>
+                <div class="step">
+                    <div class="step__n">2</div>
+                    <h3>Alert where you already page</h3>
+                    <p>ToTrackIt exposes deadline-shaped Prometheus metrics. Point a Datadog monitor or Prometheus alert at them — no new pager, no migration.</p>
+                    <div class="metric-chips">
+                        <code>processes_overdue_current</code>
+                        <code>deadline_missed_total</code>
+                        <code>completed_on_time_total</code>
+                        <code>completed_late_total</code>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step__n">3</div>
+                    <h3>Diagnose in one glance</h3>
+                    <p>The alert's deep link lands on the process page: every run in the period, impacted tags, and completion latency by segment — avg, p50, p90, p99.</p>
+                    <pre class="code"><code><span class="c-muted"># from the alert payload</span>
+<span class="c-key">"url"</span>: <span class="c-str">"https://totrackit.you.com/?name=account-activation"</span></code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Prometheus block -->
+    <section class="section section--tint" id="metrics">
+        <div class="container metrics__grid">
+            <div>
+                <p class="eyebrow">Observability-native</p>
+                <h2>Speaks fluent Prometheus</h2>
+                <p class="section__sub">
+                    Scrape <code class="inline">/prometheus</code> with the Datadog Agent or Prometheus.
+                    Build a metric-based SLO — "99% of activations complete within 1 hour" — with
+                    error budgets and burn-rate alerts in the tool your team already trusts.
+                </p>
+                <ul class="ticks">
+                    <li>Per-process overdue gauge, refreshed every 30s</li>
+                    <li>On-time / late / missed counters for SLO math</li>
+                    <li>Webhook with deep link when a deadline is breached</li>
                 </ul>
             </div>
-        </div>
-    </nav>
-
-    <!-- Hero Section -->
-    <section class="hero">
-        <div class="container">
-            <h1>Know when async processes miss their SLO — and why</h1>
-            <p>Account activations, payments, KYC checks — when they silently get stuck, customers notice first. ToTrackIt tracks every run against its deadline, feeds the alerting stack you already use, and shows which country, channel, or provider the problems concentrate in. Open source and self-hosted.</p>
-            <a href="https://github.com/plein/ToTrackIt" target="_blank" class="btn btn-primary">Get Started on GitHub</a>
+            <div class="term" role="img" aria-label="Prometheus scrape output showing ToTrackIt metrics">
+                <div class="term__bar"><span></span><span></span><span></span><em>GET /prometheus</em></div>
+                <pre class="term__body"><code><span class="c-muted"># active processes past their deadline</span>
+<span class="c-amber">totrackit_processes_overdue_current</span>{<span class="c-muted">name=</span><span class="c-str">"account-activation"</span>} <span class="c-num">3.0</span>
+<span class="c-amber">totrackit_processes_deadline_missed_total</span>{<span class="c-muted">name=</span><span class="c-str">"account-activation"</span>} <span class="c-num">14.0</span>
+<span class="c-amber">totrackit_processes_completed_on_time_total</span>{<span class="c-muted">name=</span><span class="c-str">"account-activation"</span>} <span class="c-num">1247.0</span>
+<span class="c-amber">totrackit_processes_completed_late_total</span>{<span class="c-muted">name=</span><span class="c-str">"account-activation"</span>} <span class="c-num">9.0</span></code></pre>
+            </div>
         </div>
     </section>
 
-    <!-- Features Section -->
-    <section id="features" class="features-section">
+    <!-- Features -->
+    <section class="section" id="features">
         <div class="container">
-            <h1 class="text-center mb-5">Features</h1>
-            <div class="row text-center">
-                <div class="col-md-4">
-                    <div class="icon mb-3">📈</div>
-                    <h4>Track Every Run Against Its SLO</h4>
-                    <p>Two API calls per process — start and complete. ToTrackIt computes on-track, missed, on-time, and late status in real time.</p>
+            <p class="eyebrow">What's in the box</p>
+            <h2>Small surface. Sharp answers.</h2>
+            <div class="cards">
+                <div class="card">
+                    <h3>SLO deadlines per run</h3>
+                    <p>On-track, missed, on-time, late — computed in real time from timestamps, never stale.</p>
                 </div>
-                <div class="col-md-4">
-                    <div class="icon mb-3">📟</div>
-                    <h4>Alert With the Tools You Already Use</h4>
-                    <p>Deadline-aware Prometheus metrics plug into Datadog monitors, Prometheus alerts, and metric-based SLOs — no new pager, no migration.</p>
+                <div class="card">
+                    <h3>Root cause by tags</h3>
+                    <p>See instantly that the stuck runs share a segment: country, channel, provider, customer tier.</p>
                 </div>
-                <div class="col-md-4">
-                    <div class="icon mb-3">🔍</div>
-                    <h4>Root Cause by Tags</h4>
-                    <p>When something breaks, see instantly that the stuck and slow runs share a segment — country, channel, provider — with impact and p90 latency per tag.</p>
+                <div class="card">
+                    <h3>Latency by segment</h3>
+                    <p>avg / p50 / p90 / p99 completion time per tag. Slow segments stand out before they breach.</p>
                 </div>
-            </div>
-            <div class="row text-center mt-4">
-                <div class="col-md-4">
-                    <div class="icon mb-3">🔔</div>
-                    <h4>Alerts That Land on the Answer</h4>
-                    <p>Deadline-missed webhooks carry a deep link straight to the affected process page: all runs, impacted tags, and latency for the period you pick.</p>
+                <div class="card">
+                    <h3>Per-process pages</h3>
+                    <p>A shareable URL per process with a period picker, impact breakdown, and every run.</p>
                 </div>
-                <div class="col-md-4">
-                    <div class="icon mb-3">🔌</div>
-                    <h4>API-First + Web UI</h4>
-                    <p>Register and complete processes through a REST API with OpenAPI docs, or manage everything from the clean built-in dashboard.</p>
+                <div class="card">
+                    <h3>Webhooks that land on the answer</h3>
+                    <p>Deadline-missed notifications carry tags, context, and a deep link to the affected process.</p>
                 </div>
-                <div class="col-md-4">
-                    <div class="icon mb-3">🐳</div>
-                    <h4>Self-Hosted & Open Source</h4>
-                    <p>Run the whole stack with Docker Compose — API, UI, PostgreSQL, and monitoring. Apache 2.0 licensed.</p>
+                <div class="card">
+                    <h3>Self-hosted, Apache 2.0</h3>
+                    <p>One Docker Compose file: API, UI, PostgreSQL. Java 21 + Micronaut. Your data stays yours.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Team Section -->
-    <section id="contact" class="team-section">
-        <div class="container">
-            <h2 class="text-center mb-4">Meet Our Team</h2>
-            <div class="row">
-                <div class="col-md-12 team-member">
-                    <img src="images/jordi_reina_founder.jpg" alt="Jordi Reina">
-                    <h4>Jordi Reina</h4>
-                    <p>CEO & Founder</p>
-                    <a href="https://www.linkedin.com/in/jordireina/" target="_blank" class="btn btn-primary btn-sm">LinkedIn</a>
-                </div>
+    <!-- CTA -->
+    <section class="section section--cta">
+        <div class="container cta__inner">
+            <h2>Track your first process in five minutes.</h2>
+            <div class="hero__cta">
+                <a class="btn btn--primary" href="https://github.com/plein/ToTrackIt" target="_blank" rel="noopener">View on GitHub</a>
+                <a class="btn btn--ghost" href="https://github.com/plein/ToTrackIt#-getting-started" target="_blank" rel="noopener">Read the quick start</a>
             </div>
         </div>
     </section>
 
-    <!-- Open Source Section -->
-	<section id="opensource" class="features-section">
-	    <div class="container">
-	        <h1 class="text-center mb-5">Free & Open Source</h1>
-	        <div class="text-center">
-	            <p>ToTrackIt is free to self-host under the Apache 2.0 license. A managed offering with team and enterprise features is on the roadmap.</p>
-	            <a href="https://github.com/plein/ToTrackIt" target="_blank" class="btn btn-primary">View on GitHub</a>
-	        </div>
-	    </div>
-	</section>
-
-
-    <!-- Footer -->
     <footer class="footer">
-        <div class="container">
-            <p>&copy; 2026 ToTrackIt. All rights reserved.</p>
-            <a href="#" class="text">Privacy Policy</a> | <a href="#" class="text">Terms of Service</a>
+        <div class="container footer__inner">
+            <div class="footer__brand">
+                <img src="images/favicon/favicon.svg" alt="" width="18" height="18">
+                <span>ToTrackIt</span>
+                <span class="footer__license">Apache 2.0</span>
+            </div>
+            <div class="footer__credit">
+                <img src="images/jordi_reina_founder.jpg" alt="" width="28" height="28">
+                <span>Maintained by <a href="https://www.linkedin.com/in/jordireina/" target="_blank" rel="noopener">Jordi Reina</a></span>
+            </div>
+            <div class="footer__links">
+                <a href="https://github.com/plein/ToTrackIt" target="_blank" rel="noopener">GitHub</a>
+                <a href="https://github.com/plein/ToTrackIt/issues" target="_blank" rel="noopener">Issues</a>
+                <a href="https://github.com/plein/ToTrackIt#-metrics-prometheus--datadog" target="_blank" rel="noopener">Datadog guide</a>
+            </div>
         </div>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
