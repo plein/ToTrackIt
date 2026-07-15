@@ -1,5 +1,10 @@
 # ToTrackIt
 
+[![CI](https://github.com/plein/ToTrackIt/actions/workflows/ci.yml/badge.svg)](https://github.com/plein/ToTrackIt/actions/workflows/ci.yml)
+[![Docker](https://github.com/plein/ToTrackIt/actions/workflows/publish-image.yml/badge.svg)](https://github.com/plein/ToTrackIt/actions/workflows/publish-image.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Java 21](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/projects/jdk/21/)
+
 **Open-source deadline tracking and root-cause analytics for asynchronous business processes.**
 
 Every company runs async processes with implicit SLOs — account activations, payment settlements, KYC reviews, batch imports. When one silently gets stuck, the customer finds out before you do. ToTrackIt makes those processes first-class: register each run with two API calls (start + complete), give it a deadline, and you get real-time tracking, SLO metrics, and — the part your APM can't do — **root-cause analysis by business tags**.
