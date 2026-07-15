@@ -51,6 +51,36 @@ export interface ProcessFilter {
   tags?: string
 }
 
+export interface DurationStats {
+  count: number
+  avg_seconds: number
+  p50_seconds: number
+  p90_seconds: number
+  p99_seconds: number
+}
+
+export interface TagImpactEntry {
+  key: string
+  value: string
+  overdue: number
+  on_track: number
+  completed_late: number
+  completed_on_time: number
+  failed: number
+  total: number
+  problems: number
+  duration?: DurationStats | null
+}
+
+export interface TagImpactResponse {
+  window_hours: number
+  generated_at: number
+  total_processes: number
+  problem_processes: number
+  duration?: DurationStats | null
+  tags: TagImpactEntry[]
+}
+
 export interface ApiError {
   error: string
   message: string

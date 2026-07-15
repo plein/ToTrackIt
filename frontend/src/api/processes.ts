@@ -5,6 +5,7 @@ import type {
   CompleteProcessRequest,
   ProcessFilter,
   ApiError,
+  TagImpactResponse,
 } from '@/types'
 
 function extractMessage(body: unknown): string {
@@ -90,6 +91,13 @@ export async function deleteProcess(name: string, id: string): Promise<void> {
       path: `/processes/${name}/${id}`,
     }
   }
+}
+
+export async function getTagImpact(name?: string, windowHours = 24): Promise<TagImpactResponse> {
+  const params = new URLSearchParams()
+  if (name) params.set('name', name)
+  params.set('window_hours', String(windowHours))
+  return request<TagImpactResponse>(`/analytics/tags?${params.toString()}`)
 }
 
 export async function completeProcess(

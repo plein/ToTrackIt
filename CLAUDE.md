@@ -75,15 +75,15 @@ Clean layered architecture: **Controller → Service → Repository → Entity/D
 
 ```
 src/main/java/com/totrackit/
-├── controller/       # HTTP layer: ProcessController, HealthController, GlobalExceptionHandler
-├── service/          # Business logic: ProcessService, MetricsService, HealthService
+├── controller/       # HTTP layer: ProcessController, AnalyticsController (/analytics/tags), HealthController, GlobalExceptionHandler
+├── service/          # Business logic: ProcessService, AnalyticsService (tag-impact aggregation), MetricsService, HealthService
 ├── repository/       # JDBC data access: ProcessRepository (custom queries, filtering, pagination)
 ├── entity/           # DB entity: ProcessEntity, enums ProcessStatus / DeadlineStatus
 ├── dto/              # Request/response types: NewProcessRequest, ProcessResponse, PagedResult, ProcessFilter
 ├── mapper/           # ProcessMapper (entity ↔ DTO)
 ├── interceptor/      # MetricsInterceptor (HTTP request metrics)
 ├── filter/           # ApiKeyFilter (optional static API key, active only when TOTRACKIT_API_KEY is set)
-└── task/             # Scheduled tasks: MetricsUpdateTask, DeadlineNotificationTask (webhook on missed deadline, active only when TOTRACKIT_WEBHOOK_URL is set)
+└── task/             # Scheduled tasks: MetricsUpdateTask (gauges incl. per-name overdue), DeadlineNotificationTask (always runs: records deadline-missed metric; also sends webhook when TOTRACKIT_WEBHOOK_URL is set; payload deep-links to the dashboard when TOTRACKIT_PUBLIC_URL is set)
 src/main/resources/
 ├── application*.yml  # Micronaut config per environment
 └── db/migration/     # Flyway migrations (V1 baseline → V2 schema → V3 indexes → V4 namespace_id + deadline_notified_at)
@@ -96,7 +96,7 @@ New columns also need mirroring in `src/test/resources/schema.sql` (H2 test sche
 - **DeadlineStatus is computed at read time** — not persisted. `ProcessService` calculates `ON_TRACK`, `MISSED`, `COMPLETED_ON_TIME`, `COMPLETED_LATE` from stored timestamps.
 - **Uniqueness** is enforced via a PostgreSQL partial unique index on `process_id` where `status = 'ACTIVE'` (V2 migration), preventing race conditions at the DB level instead of application level.
 - **Tags and context** are stored as JSONB columns for flexibility without schema migrations.
-- **Metrics** are recorded in `MetricsService` and wired via `MetricsInterceptor`; Prometheus scrapes `/prometheus`.
+- **Metrics** are recorded in `MetricsService` and wired via `MetricsInterceptor`; Prometheus scrapes `/prometheus`. Deadline-aware series (`totrackit_processes_overdue_current` gauge per process_name, `deadline_missed`/`completed_on_time`/`completed_late` counters) exist so external monitors (Prometheus alerts, Datadog SLOs) can page on deadline breaches — see the README "Metrics, Prometheus & Datadog" section.
 - **OpenAPI docs** are auto-generated from annotations and served at `/openapi.yml`; Swagger UI runs on a separate nginx container at port 8081.
 
 ### Database Schema

@@ -7,6 +7,8 @@ import { StatusPill } from '@/components/StatusPill'
 import { STATUS_TONE } from '@/lib/statusTone'
 import { TagChip } from '@/components/TagChip'
 import { DeadlineBar } from '@/components/DeadlineBar'
+import { ImpactedTags } from '@/components/ImpactedTags'
+import { useTagImpact } from '@/hooks/useProcesses'
 
 const now = () => Math.floor(Date.now() / 1000)
 
@@ -108,6 +110,7 @@ interface DashboardProps {
   onOpenProcess: (p: ProcessResponse) => void
   onOpenCreate: () => void
   onComplete: (p: ProcessResponse, status: 'COMPLETED' | 'FAILED') => void
+  onOpenName?: (name: string) => void
   density?: string
   initialNameFilter?: string | null
   initialTagFilter?: { key: string; value: string } | null
@@ -121,6 +124,7 @@ export function Dashboard({
   onOpenProcess,
   onOpenCreate,
   onComplete,
+  onOpenName,
   density = 'comfortable',
   initialNameFilter,
   initialTagFilter,
@@ -136,6 +140,7 @@ export function Dashboard({
   const [activeTags, setActiveTags] = useState<ProcessTag[]>(initialTagFilter ? [initialTagFilter] : [])
   const [sortField, setSortField] = useState<keyof ProcessResponse>('started_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const { data: tagImpact } = useTagImpact()
 
   // Reset filters when navigation changes; render-phase state adjustment
   // instead of an effect (see React docs on resetting state when a prop changes)
@@ -297,6 +302,15 @@ export function Dashboard({
         />
       </div>
 
+      {tagImpact && (
+        <ImpactedTags
+          entries={tagImpact.tags}
+          windowHours={tagImpact.window_hours}
+          activeTags={activeTags}
+          onToggleTag={toggleTag}
+        />
+      )}
+
       <div className="tti-filterbar">
         <div className="tti-search">
           <Icon name="search" size={16} />
@@ -400,8 +414,12 @@ export function Dashboard({
                 <button
                   type="button"
                   className="tti-row__name tti-row__name--link"
-                  onClick={(e) => { e.stopPropagation(); setNameFilter(p.name) }}
-                  title={`Show all runs of ${p.name}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (onOpenName) onOpenName(p.name)
+                    else setNameFilter(p.name)
+                  }}
+                  title={`Open ${p.name}: all runs, impact, and latency`}
                 >
                   {p.name}
                 </button>

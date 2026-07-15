@@ -1,10 +1,15 @@
 package com.totrackit.metrics;
 
+import com.totrackit.entity.ProcessEntity;
+import com.totrackit.model.ProcessStatus;
 import com.totrackit.service.MetricsService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -104,5 +109,81 @@ public class MetricsServiceTest {
         // Verify we can find our custom metrics
         assertNotNull(meterRegistry.find("totrackit_processes_created_total").counter());
         assertNotNull(meterRegistry.find("totrackit_database_operations_total").counter());
+    }
+
+    @Test
+    public void testActiveProcessesGaugeReflectsLatestValue() {
+        metricsService.recordActiveProcessesCount(5L);
+        metricsService.recordActiveProcessesCount(10L);
+
+        // The gauge must track the most recent sample, not the first one
+        assertEquals(10.0, meterRegistry.find("totrackit_active_processes_current").gauge().value());
+    }
+
+    private ProcessEntity completedProcess(String name, long deadlineOffsetFromCompletion) {
+        ProcessEntity entity = new ProcessEntity("proc-1", name);
+        entity.setStatus(ProcessStatus.COMPLETED);
+        Instant completedAt = Instant.now();
+        entity.setStartedAt(completedAt.minusSeconds(600));
+        entity.setCompletedAt(completedAt);
+        entity.setDeadline(completedAt.plusSeconds(deadlineOffsetFromCompletion));
+        return entity;
+    }
+
+    @Test
+    public void testRecordProcessCompletedOnTime() {
+        // Deadline 60s after completion -> on time
+        metricsService.recordProcessCompleted(completedProcess("on-time-proc", 60));
+
+        assertEquals(1.0, meterRegistry.find("totrackit_processes_completed_on_time_total")
+                .tag("process_name", "on-time-proc").counter().count());
+        assertNull(meterRegistry.find("totrackit_processes_completed_late_total").counter());
+    }
+
+    @Test
+    public void testRecordProcessCompletedLate() {
+        // Deadline 60s before completion -> late
+        metricsService.recordProcessCompleted(completedProcess("late-proc", -60));
+
+        assertEquals(1.0, meterRegistry.find("totrackit_processes_completed_late_total")
+                .tag("process_name", "late-proc").counter().count());
+        assertNull(meterRegistry.find("totrackit_processes_completed_on_time_total").counter());
+    }
+
+    @Test
+    public void testRecordProcessCompletedWithoutDeadlineSkipsOutcomeCounters() {
+        ProcessEntity entity = completedProcess("no-deadline-proc", 0);
+        entity.setDeadline(null);
+        metricsService.recordProcessCompleted(entity);
+
+        assertNull(meterRegistry.find("totrackit_processes_completed_on_time_total").counter());
+        assertNull(meterRegistry.find("totrackit_processes_completed_late_total").counter());
+    }
+
+    @Test
+    public void testRecordDeadlineMissed() {
+        metricsService.recordDeadlineMissed("stuck-proc");
+        metricsService.recordDeadlineMissed("stuck-proc");
+
+        assertEquals(2.0, meterRegistry.find("totrackit_processes_deadline_missed_total")
+                .tag("process_name", "stuck-proc").counter().count());
+    }
+
+    @Test
+    public void testOverdueGaugePerNameUpdateAndReset() {
+        metricsService.updateOverdueProcessCounts(Map.of("proc-a", 3L, "proc-b", 1L));
+
+        assertEquals(3.0, meterRegistry.find("totrackit_processes_overdue_current")
+                .tag("process_name", "proc-a").gauge().value());
+        assertEquals(1.0, meterRegistry.find("totrackit_processes_overdue_current")
+                .tag("process_name", "proc-b").gauge().value());
+
+        // proc-a recovers: absent from the next snapshot -> gauge drops to 0
+        metricsService.updateOverdueProcessCounts(Map.of("proc-b", 2L));
+
+        assertEquals(0.0, meterRegistry.find("totrackit_processes_overdue_current")
+                .tag("process_name", "proc-a").gauge().value());
+        assertEquals(2.0, meterRegistry.find("totrackit_processes_overdue_current")
+                .tag("process_name", "proc-b").gauge().value());
     }
 }

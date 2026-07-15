@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { listProcesses, createProcess, completeProcess, deleteProcess } from '@/api/processes'
+import { listProcesses, createProcess, completeProcess, deleteProcess, getTagImpact } from '@/api/processes'
 import type { ProcessFilter, ProcessResponse, NewProcessRequest, CompleteProcessRequest } from '@/types'
 
 const PAGE_SIZE = 100
@@ -21,6 +21,14 @@ export function useProcessList(filter: ProcessFilter = {}) {
     queryKey: ['processes', filter],
     queryFn: () => fetchAllProcesses(filter),
     refetchInterval: 10_000,
+  })
+}
+
+export function useTagImpact(name?: string, windowHours = 24) {
+  return useQuery({
+    queryKey: ['tag-impact', name ?? null, windowHours],
+    queryFn: () => getTagImpact(name, windowHours),
+    refetchInterval: 30_000,
   })
 }
 

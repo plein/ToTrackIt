@@ -13,6 +13,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/processes': 'http://localhost:8080',
+      '/analytics': 'http://localhost:8080',
       '/health': 'http://localhost:8080',
     },
   },

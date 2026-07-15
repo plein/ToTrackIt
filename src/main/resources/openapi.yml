@@ -18,7 +18,43 @@ tags:
   description: Health check and monitoring endpoints
 - name: Processes
   description: Process tracking and management operations
+- name: Analytics
+  description: Aggregated statistics across processes
 paths:
+  /analytics/tags:
+    get:
+      tags:
+      - Analytics
+      summary: Tag impact breakdown
+      description: "Aggregates deadline outcomes (overdue, late, on-time, failed)\
+        \ per tag key/value, most problematic tags first. Use it to see which segment\
+        \ (country, locale, provider, ...) a problem is concentrated in."
+      operationId: tagImpact
+      parameters:
+      - name: name
+        in: query
+        description: Filter by process name
+        schema:
+          type: string
+          nullable: true
+      - name: window_hours
+        in: query
+        description: "Include processes finished within the last N hours (1-720, default\
+          \ 24). Active processes are always included."
+        required: true
+        schema:
+          maximum: 720
+          minimum: 1
+          type: integer
+          format: int32
+          default: 24
+      responses:
+        "200":
+          description: Per-tag impact breakdown
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagImpactResponse'
   /health/live:
     get:
       tags:
@@ -372,6 +408,26 @@ components:
       - MISSED
       - COMPLETED_ON_TIME
       - COMPLETED_LATE
+    DurationStats:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int64
+        avg_seconds:
+          type: number
+          format: double
+        p50_seconds:
+          type: number
+          format: double
+        p90_seconds:
+          type: number
+          format: double
+        p99_seconds:
+          type: number
+          format: double
+      description: Completion-duration statistics (seconds) over a set of finished
+        runs. Percentiles use the nearest-rank method.
     NewProcessRequest:
       required:
       - id
@@ -466,3 +522,75 @@ components:
           type: string
       description: Represents a tag associated with a process for categorization and
         filtering.
+    TagImpactEntry:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+        overdue:
+          type: integer
+          description: Active processes currently past their deadline.
+          format: int64
+        on_track:
+          type: integer
+          description: Active processes still within their deadline (or without one).
+          format: int64
+        completed_late:
+          type: integer
+          description: Processes completed after their deadline within the window.
+          format: int64
+        completed_on_time:
+          type: integer
+          description: Processes completed within their deadline within the window.
+          format: int64
+        failed:
+          type: integer
+          description: Processes that failed within the window.
+          format: int64
+        total:
+          type: integer
+          description: All processes carrying this tag seen in the window.
+          format: int64
+        problems:
+          type: integer
+          description: overdue + completed_late + failed; the sort key for impact.
+          format: int64
+        duration:
+          description: Completion-duration stats for this tag's finished runs; null
+            when none.
+          allOf:
+          - $ref: '#/components/schemas/DurationStats'
+      description: "Aggregated deadline outcomes for a single tag key/value pair,\
+        \ used to show which segments (country, locale, provider, ...) a problem is\
+        \ concentrated in."
+    TagImpactResponse:
+      type: object
+      properties:
+        duration:
+          description: Completion-duration stats across all finished runs in the window.
+          allOf:
+          - $ref: '#/components/schemas/DurationStats'
+        window_hours:
+          type: integer
+          format: int32
+        generated_at:
+          type: integer
+          format: int64
+        total_processes:
+          type: integer
+          description: "All processes considered (active, or finished within the window)."
+          format: int64
+        problem_processes:
+          type: integer
+          description: "Processes currently overdue, completed late, or failed in\
+            \ the window."
+          format: int64
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagImpactEntry'
+      description: "Response for the tag-impact analytics endpoint: which tag segments\
+        \ the current problems (overdue, late, failed processes) are concentrated\
+        \ in."

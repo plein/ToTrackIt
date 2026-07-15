@@ -1,5 +1,6 @@
 package com.totrackit.task;
 
+import com.totrackit.entity.ProcessEntity;
 import com.totrackit.model.ProcessStatus;
 import com.totrackit.repository.ProcessRepository;
 import com.totrackit.service.MetricsService;
@@ -8,6 +9,10 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Scheduled task to update gauge metrics that need periodic refresh.
@@ -37,8 +42,14 @@ public class MetricsUpdateTask {
             // Update active processes count
             long activeProcessCount = processRepository.countByStatus(ProcessStatus.ACTIVE);
             metricsService.recordActiveProcessesCount(activeProcessCount);
-            
-            LOG.debug("Updated gauge metrics - active processes: {}", activeProcessCount);
+
+            // Update per-name overdue gauges (active processes past their deadline)
+            Map<String, Long> overdueByName = processRepository.findOverdueProcesses(Instant.now()).stream()
+                    .collect(Collectors.groupingBy(ProcessEntity::getName, Collectors.counting()));
+            metricsService.updateOverdueProcessCounts(overdueByName);
+
+            LOG.debug("Updated gauge metrics - active processes: {}, overdue names: {}",
+                    activeProcessCount, overdueByName.size());
             
         } catch (Exception e) {
             LOG.warn("Failed to update gauge metrics", e);

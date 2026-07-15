@@ -9,6 +9,7 @@ import { Icon } from '@/components/Icon'
 import { Button } from '@/components/Button'
 import { Dashboard } from '@/pages/Dashboard'
 import { NameRollups } from '@/pages/NameRollups'
+import { ProcessName } from '@/pages/ProcessName'
 import { Tags } from '@/pages/Tags'
 import { Metrics } from '@/pages/Metrics'
 
@@ -51,6 +52,10 @@ function ErrorScreen({ onRetry }: { onRetry: () => void }) {
 
 export default function App() {
   const [activeNav, setActiveNav] = useState<NavId>('processes')
+  // Per-name view, addressable as /?name=<process-name>
+  const [nameView, setNameView] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get('name'),
+  )
   const [nameJump, setNameJump] = useState<string | null>(null)
   // null = no filter; {key,value} = tag filter applied from Tags page
   const [tagJump, setTagJump] = useState<{ key: string; value: string } | null>(null)
@@ -64,6 +69,23 @@ export default function App() {
   }, [theme])
 
   const { data: allProcesses = [], isLoading, isFetching, isError, refetch } = useProcessList()
+
+  // Deep link from alerts: /?process=<name>/<id> opens the process detail panel
+  // (this is the URL embedded in deadline-missed webhook payloads).
+  // Render-phase state adjustment, same pattern as Dashboard's filter reset.
+  const [pendingDeepLink, setPendingDeepLink] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get('process'),
+  )
+  if (pendingDeepLink && !isLoading) {
+    setPendingDeepLink(null)
+    const slash = pendingDeepLink.indexOf('/')
+    if (slash > 0) {
+      const name = pendingDeepLink.slice(0, slash)
+      const id = pendingDeepLink.slice(slash + 1)
+      const proc = allProcesses.find((p) => p.name === name && p.id === id)
+      if (proc) setOpenProc(proc)
+    }
+  }
 
   const filteredByNav = useMemo(() => {
     switch (activeNav) {
@@ -123,8 +145,31 @@ export default function App() {
     )
   }, [completeMut, openProc, flash])
 
+  const openNameView = useCallback((name: string) => {
+    setNameView(name)
+    const url = new URL(window.location.href)
+    url.searchParams.set('name', name)
+    url.searchParams.delete('process')
+    window.history.pushState({}, '', url)
+  }, [])
+
+  const closeNameView = useCallback(() => {
+    setNameView(null)
+    const url = new URL(window.location.href)
+    url.searchParams.delete('name')
+    window.history.pushState({}, '', url)
+  }, [])
+
+  // Keep the view in sync with browser back/forward
+  useEffect(() => {
+    const onPop = () => setNameView(new URLSearchParams(window.location.search).get('name'))
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
   const handleNav = (id: NavId) => {
     setActiveNav(id)
+    if (nameView) closeNameView()
     setNameJump(null)
     setTagJump(null)
   }
@@ -132,6 +177,7 @@ export default function App() {
   // Navigate to Processes view pre-filtered by a tag from the Tags page
   const handleFilterTag = (key: string, value: string) => {
     setActiveNav('processes')
+    if (nameView) closeNameView()
     setNameJump(null)
     setTagJump({ key, value })
   }
@@ -144,6 +190,14 @@ export default function App() {
           <LoadingScreen />
         ) : isError ? (
           <ErrorScreen onRetry={() => refetch()} />
+        ) : nameView ? (
+          <ProcessName
+            name={nameView}
+            processes={allProcesses}
+            onBack={closeNameView}
+            onOpenProcess={setOpenProc}
+            onComplete={handleComplete}
+          />
         ) : activeNav === 'names' ? (
           <div className="tti-dashboard">
             <div className="tti-page-header">
@@ -157,7 +211,7 @@ export default function App() {
             </div>
             <NameRollups
               processes={allProcesses}
-              onPickName={(n) => { setActiveNav('processes'); setNameJump(n); setTagJump(null) }}
+              onPickName={openNameView}
               onOpenProcess={setOpenProc}
             />
           </div>
@@ -188,6 +242,7 @@ export default function App() {
             onOpenProcess={setOpenProc}
             onOpenCreate={() => setShowCreate(true)}
             onComplete={handleComplete}
+            onOpenName={openNameView}
             initialNameFilter={nameJump}
             initialTagFilter={tagJump}
             navKey={activeNav + (nameJump || '') + (tagJump ? `${tagJump.key}:${tagJump.value}` : '')}

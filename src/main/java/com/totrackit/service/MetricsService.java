@@ -3,6 +3,7 @@ package com.totrackit.service;
 import com.totrackit.entity.ProcessEntity;
 import com.totrackit.model.ProcessStatus;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.inject.Inject;
@@ -12,7 +13,10 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Service for recording custom application metrics.
@@ -24,10 +28,19 @@ public class MetricsService {
     private static final Logger LOG = LoggerFactory.getLogger(MetricsService.class);
     
     private final MeterRegistry meterRegistry;
-    
+
+    // Gauges must reference a live object; re-registering with a boxed number
+    // binds the gauge to the first value forever. These holders are updated
+    // in place and strongly referenced for the lifetime of the service.
+    private final AtomicLong activeProcesses = new AtomicLong();
+    private final ConcurrentHashMap<String, AtomicLong> overdueByName = new ConcurrentHashMap<>();
+
     @Inject
     public MetricsService(MeterRegistry meterRegistry) {
         this.meterRegistry = meterRegistry;
+        Gauge.builder("totrackit_active_processes_current", activeProcesses, AtomicLong::get)
+                .description("Current number of active processes")
+                .register(meterRegistry);
     }
     
     /**
@@ -78,6 +91,23 @@ public class MetricsService {
                         .increment();
             }
             
+            // Record deadline outcome for completed processes that had a deadline.
+            // These counters let external monitors (Prometheus alerts, Datadog SLOs)
+            // compute on-time rates without querying the API.
+            if (entity.getStatus() == ProcessStatus.COMPLETED
+                    && entity.getDeadline() != null && entity.getCompletedAt() != null) {
+                boolean onTime = !entity.getCompletedAt().isAfter(entity.getDeadline());
+                Counter.builder(onTime
+                                ? "totrackit_processes_completed_on_time_total"
+                                : "totrackit_processes_completed_late_total")
+                        .description(onTime
+                                ? "Total number of processes completed before their deadline"
+                                : "Total number of processes completed after their deadline")
+                        .tag("process_name", processName)
+                        .register(meterRegistry)
+                        .increment();
+            }
+
             // Record process duration if we have both start and completion times
             if (entity.getStartedAt() != null && entity.getCompletedAt() != null) {
                 Duration duration = Duration.between(entity.getStartedAt(), entity.getCompletedAt());
@@ -158,15 +188,60 @@ public class MetricsService {
     /**
      * Records current active processes count as a gauge.
      * This should be called periodically to update the gauge value.
-     * 
+     *
      * @param count the current number of active processes
      */
     public void recordActiveProcessesCount(long count) {
+        activeProcesses.set(count);
+        LOG.debug("Updated active processes gauge: {}", count);
+    }
+
+    /**
+     * Records that a process missed its deadline. Incremented once per process,
+     * when the deadline scanner first processes the breach.
+     *
+     * @param processName the name of the process that missed its deadline
+     */
+    public void recordDeadlineMissed(String processName) {
         try {
-            meterRegistry.gauge("totrackit_active_processes_current", count);
-            LOG.debug("Updated active processes gauge: {}", count);
+            Counter.builder("totrackit_processes_deadline_missed_total")
+                    .description("Total number of processes that missed their deadline")
+                    .tag("process_name", processName != null ? processName : "unknown")
+                    .register(meterRegistry)
+                    .increment();
         } catch (Exception e) {
-            LOG.warn("Failed to update active processes gauge", e);
+            LOG.warn("Failed to record deadline missed metric", e);
         }
+    }
+
+    /**
+     * Updates the per-process-name gauge of active processes currently past
+     * their deadline. Names missing from the snapshot are reset to zero so a
+     * recovered process name doesn't keep alerting.
+     *
+     * @param countsByName current overdue counts keyed by process name
+     */
+    public void updateOverdueProcessCounts(Map<String, Long> countsByName) {
+        try {
+            countsByName.forEach((name, count) -> overdueGaugeFor(name).set(count));
+            overdueByName.forEach((name, holder) -> {
+                if (!countsByName.containsKey(name)) {
+                    holder.set(0);
+                }
+            });
+        } catch (Exception e) {
+            LOG.warn("Failed to update overdue process gauges", e);
+        }
+    }
+
+    private AtomicLong overdueGaugeFor(String processName) {
+        return overdueByName.computeIfAbsent(processName, name -> {
+            AtomicLong holder = new AtomicLong();
+            Gauge.builder("totrackit_processes_overdue_current", holder, AtomicLong::get)
+                    .description("Active processes currently past their deadline")
+                    .tag("process_name", name)
+                    .register(meterRegistry);
+            return holder;
+        });
     }
 }
