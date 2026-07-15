@@ -86,6 +86,11 @@ services:
       TOTRACKIT_METRICS_ENABLED: ${METRICS_ENABLED:-true}
       TOTRACKIT_HEALTH_CHECKS_ENABLED: ${HEALTH_CHECKS_ENABLED:-true}
       TOTRACKIT_LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      # Optional static API key for /processes routes (empty = auth disabled)
+      TOTRACKIT_API_KEY: ${TOTRACKIT_API_KEY:-}
+      # Optional webhook for deadline-breach notifications (empty = disabled)
+      TOTRACKIT_WEBHOOK_URL: ${TOTRACKIT_WEBHOOK_URL:-}
       
     depends_on:
       postgres:

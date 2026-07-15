@@ -146,6 +146,26 @@ public interface ProcessRepository extends CrudRepository<ProcessEntity, Long> {
     List<ProcessEntity> findOverdueProcesses(Instant currentTime);
     
     /**
+     * Finds overdue active processes that have not yet had a deadline-breach
+     * notification sent.
+     *
+     * @param currentTime the current timestamp to compare against
+     * @return list of overdue, unnotified processes
+     */
+    @Query("SELECT * FROM processes WHERE status = 'ACTIVE' AND deadline IS NOT NULL AND deadline < :currentTime " +
+           "AND deadline_notified_at IS NULL ORDER BY deadline ASC")
+    List<ProcessEntity> findOverdueUnnotified(Instant currentTime);
+
+    /**
+     * Marks a process as having been notified about its missed deadline.
+     *
+     * @param id the internal process ID
+     * @param notifiedAt when the notification was sent
+     */
+    @Query("UPDATE processes SET deadline_notified_at = :notifiedAt WHERE id = :id")
+    void markDeadlineNotified(Long id, Instant notifiedAt);
+
+    /**
      * Finds processes by status.
      * 
      * @param status the process status

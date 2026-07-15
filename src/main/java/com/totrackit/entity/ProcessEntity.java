@@ -50,6 +50,9 @@ public class ProcessEntity {
     @MappedProperty(value = "context", type = DataType.JSON)
     private String context;
     
+    @MappedProperty("deadline_notified_at")
+    private Instant deadlineNotifiedAt;
+
     @MappedProperty("created_at")
     private Instant createdAt;
     
@@ -146,6 +149,14 @@ public class ProcessEntity {
         this.context = context;
     }
     
+    public Instant getDeadlineNotifiedAt() {
+        return deadlineNotifiedAt;
+    }
+
+    public void setDeadlineNotifiedAt(Instant deadlineNotifiedAt) {
+        this.deadlineNotifiedAt = deadlineNotifiedAt;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
