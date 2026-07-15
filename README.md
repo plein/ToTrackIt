@@ -1,24 +1,36 @@
 # ToTrackIt
 
-**Open-source SaaS platform to track, monitor, and analyze asynchronous processes.**
+**Open-source deadline tracking and root-cause analytics for asynchronous business processes.**
 
-ToTrackIt helps organizations gain visibility into critical business operations, ensuring deadlines are met, incidents are reduced, and teams have actionable insights for continuous improvement.
+Every company runs async processes with implicit SLOs — account activations, payment settlements, KYC reviews, batch imports. When one silently gets stuck, the customer finds out before you do. ToTrackIt makes those processes first-class: register each run with two API calls (start + complete), give it a deadline, and you get real-time tracking, SLO metrics, and — the part your APM can't do — **root-cause analysis by business tags**.
+
+**ToTrackIt is the diagnosis layer, not the pager.** Keep alerting in the stack you already trust: ToTrackIt exposes deadline-shaped Prometheus metrics that plug straight into Datadog monitors, Prometheus alerts, and metric-based SLOs. When an alert fires, its deep link lands on the process page in ToTrackIt — and the impacted-tags view tells you in one glance that all 12 stuck activations share `country:DE` and `kyc:provider-x`, and that DE's p90 latency is 9× everyone else's.
+
+```
+your process ──2 API calls──▶ ToTrackIt ──/prometheus──▶ Datadog / Prometheus (alerting, SLOs)
+                                  ▲                                  │ alert fires
+                                  └────────── deep link ─────────────┘
+                          "all problems are country:DE" — impacted tags, latency by tag
+```
 
 ---
 
 ## ✨ Features
 
-* **Process Tracking & Deadlines**
-  Register processes with unique IDs, deadlines, and metadata. Track them in real time.
+* **Process Tracking & SLO Deadlines**
+  Register runs with unique IDs, deadlines, tags, and context. Deadline status (`ON_TRACK`, `MISSED`, `COMPLETED_ON_TIME`, `COMPLETED_LATE`) is computed in real time.
+
+* **Works With Your Alerting** — Datadog, Prometheus, Grafana
+  Deadline-aware metrics (`overdue_current` gauge, missed/on-time/late counters) power stuck-process monitors and metric-based SLOs in the tools your on-call already watches. See [Metrics, Prometheus & Datadog](#-metrics-prometheus--datadog).
+
+* **Root Cause by Tags**
+  Tag runs with business dimensions (`country`, `channel`, `provider`, `customerId`…). The impacted-tags view and `GET /analytics/tags` show which segment the overdue, late, and failed runs concentrate in — and completion latency (avg/p50/p90/p99) per tag, so slow segments stand out.
+
+* **Per-Process Pages & Alert Deep Links**
+  Every process name has a shareable page (`/?name=account-activation`) with all runs, a period picker, impact and latency breakdowns. Webhook notifications carry a URL that lands the on-call directly on the affected process.
 
 * **Webhook Notifications**
-  Get a webhook notification when a process misses its deadline. (Email and other channels are on the roadmap.)
-
-* **Tags & Contextual Data**
-  Add tags (e.g. `environment=production`, `priority=high`) or custom context (e.g. `customerId: 1234`) for granular analysis.
-
-* **Metrics & Analytics**
-  Measure average completion times, missed deadlines, and completion trends per process — in the UI and via Prometheus/Grafana.
+  A JSON POST fires when a process misses its deadline, with tags, context, and the dashboard deep link. (Email and other channels are on the roadmap.)
 
 * **APIs + UI**
   Use the built-in web UI or the REST API (with OpenAPI docs) to register, complete, and analyze processes.
@@ -196,6 +208,7 @@ The easiest way to explore and test the API is through the **Swagger UI**:
 * `GET /processes/{name}/{id}` → Get a single process
 * `PUT /processes/{name}/{id}/complete` → Mark process as completed (or failed)
 * `DELETE /processes/{name}/{id}` → Delete a process
+* `GET /analytics/tags` → Per-tag breakdown of deadline outcomes (which country/locale/segment the problems are concentrated in)
 
 ### Example (register process):
 
@@ -344,11 +357,59 @@ Set `TOTRACKIT_WEBHOOK_URL` to enable deadline-breach notifications. A backgroun
   "started_at": 1699990000,
   "deadline": 1699999999,
   "tags": [{ "key": "env", "value": "prod" }],
-  "context": { "customerId": "C1234" }
+  "context": { "customerId": "C1234" },
+  "url": "https://totrackit.internal.example.com/?process=dataImport/batch42"
 }
 ```
 
 Any 2xx response marks the process as notified; failed deliveries are retried on the next scan. Point it at Slack (via a bridge), your incident tooling, or any HTTP endpoint.
+
+The `url` field is included when `TOTRACKIT_PUBLIC_URL` is set to the public base URL of the dashboard — it deep-links straight to the impacted process, so whoever receives the alert is one click away from the process page and the impacted-tags view.
+
+The deadline scanner runs regardless of webhook configuration; it also feeds the `totrackit_processes_deadline_missed_total` metric (see below).
+
+---
+
+## 📊 Metrics, Prometheus & Datadog
+
+ToTrackIt exposes Prometheus/OpenMetrics at `/prometheus`. Beyond HTTP and DB metrics, the deadline-aware metrics are designed to plug ToTrackIt into whatever alerting your team already pages on:
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `totrackit_processes_overdue_current` | gauge | `process_name` | Active processes currently past their deadline (updated every 30s) |
+| `totrackit_processes_deadline_missed_total` | counter | `process_name` | Deadline breaches, counted once per process |
+| `totrackit_processes_completed_on_time_total` | counter | `process_name` | Completions within the deadline |
+| `totrackit_processes_completed_late_total` | counter | `process_name` | Completions after the deadline |
+| `totrackit_active_processes_current` | gauge | — | All currently active processes |
+
+### Prometheus alert example
+
+```yaml
+- alert: ProcessOverdue
+  expr: totrackit_processes_overdue_current > 0
+  for: 1m
+  annotations:
+    summary: "{{ $labels.process_name }}: {{ $value }} process(es) past deadline"
+```
+
+### Datadog
+
+The Datadog Agent scrapes `/prometheus` natively via its OpenMetrics integration — add to `conf.d/openmetrics.d/conf.yaml`:
+
+```yaml
+instances:
+  - openmetrics_endpoint: http://<totrackit-host>:8080/prometheus
+    namespace: totrackit
+    metrics:
+      - totrackit_.*
+```
+
+Typical monitors:
+
+* **Stuck processes** — metric monitor on `totrackit.processes_overdue_current` `> 0` by `process_name`. Fires while anything is past its deadline; resolves when the backlog clears.
+* **SLO / on-time rate** — create a Datadog metric-based SLO with good events = `completed_on_time_total` and total events = `completed_on_time_total + completed_late_total + deadline_missed_total`. This gives you error budgets and burn-rate alerts on e.g. "99% of account activations complete within 1 hour".
+
+When a monitor fires, the dashboard's **Impacted tags** panel (and `GET /analytics/tags`) shows which segment — country, locale, provider — the overdue and late processes are concentrated in.
 
 ---
 
@@ -360,14 +421,19 @@ Any 2xx response marks the process as notified; failed deliveries are retried on
 * PostgreSQL with Flyway migrations; Docker Compose for dev and prod
 * Observability: health endpoints, Prometheus metrics, Grafana/Alertmanager stack
 * Web UI: dashboard, per-name rollups, tags, metrics
-* Webhook notifications on missed deadlines
+* Webhook notifications on missed deadlines (with dashboard deep-links)
+* Deadline-aware metrics for Prometheus/Datadog monitors and SLOs
+* Tag-impact analytics: which segment the problems concentrate in, with completion latency (avg/p50/p90/p99) overall and per tag
+* Per-name process pages (`/?name=...`) with period picker, impact, and latency breakdowns
 * Optional static API key
 
 ### Next (open-source core)
 
+* Pre-deadline warning events (notify at e.g. 75% of the SLO, before the customer notices)
+* Webhook signing (HMAC) and per-namespace webhook routing
+* Time-series analytics (trends over time, not just windows)
 * Email notification channel
 * Helm chart / Kustomize for Kubernetes
-* Advanced analytics (percentiles, time-series)
 * SDKs (Java/TS/Go)
 * OpenTelemetry exporter
 
