@@ -11,20 +11,20 @@ ToTrackIt helps organizations gain visibility into critical business operations,
 * **Process Tracking & Deadlines**
   Register processes with unique IDs, deadlines, and metadata. Track them in real time.
 
-* **Notifications**
-  Get alerted via email or webhooks when deadlines approach or are breached.
+* **Webhook Notifications**
+  Get a webhook notification when a process misses its deadline. (Email and other channels are on the roadmap.)
 
 * **Tags & Contextual Data**
   Add tags (e.g. `environment=production`, `priority=high`) or custom context (e.g. `customerId: 1234`) for granular analysis.
 
 * **Metrics & Analytics**
-  Measure average completion times, missed deadlines %, and latency distributions per namespace, process, or tag.
-
-* **Secure Access Control**
-  Namespaces and API keys to isolate workloads. Integrate with Cognito/Auth0 for authentication.
+  Measure average completion times, missed deadlines, and completion trends per process — in the UI and via Prometheus/Grafana.
 
 * **APIs + UI**
-  Use a simple UI or robust APIs to register, complete, and analyze processes.
+  Use the built-in web UI or the REST API (with OpenAPI docs) to register, complete, and analyze processes.
+
+* **Self-Hosted & Open Source**
+  Run the full stack with Docker Compose. Optional static API key for API access (see [Security](#-security)).
 
 ---
 
@@ -124,8 +124,8 @@ The API will be available at:
 The Swagger UI will be available at:
 `http://localhost:8081/` (API documentation and testing)
 
-The UI will be available at:
-`http://localhost:3000/` (coming in Phase 2)
+The web UI dev server (Vite) will be available at:
+`http://localhost:5173/` (run `cd frontend && npm install && npm run dev`)
 
 ---
 
@@ -202,15 +202,15 @@ The easiest way to explore and test the API is through the **Swagger UI**:
 ### Key Endpoints
 
 * `POST /processes/{name}` → Start a process
-* `POST /processes/{name}/{id}/complete` → Mark process as completed
-* `GET /processes/metrics` → Get metrics & deadline breaches
-* `POST /notifications` → Configure alerts
+* `GET /processes` → List processes (filtering + pagination)
+* `GET /processes/{name}/{id}` → Get a single process
+* `PUT /processes/{name}/{id}/complete` → Mark process as completed (or failed)
+* `DELETE /processes/{name}/{id}` → Delete a process
 
 ### Example (register process):
 
 ```bash
-curl -X POST "http://localhost:8080/v1/processes/dataImport" \
-  -H "X-API-KEY: ns_abc123" \
+curl -X POST "http://localhost:8080/processes/dataImport" \
   -H "Content-Type: application/json" \
   -d '{
         "id": "batch42",
@@ -219,6 +219,8 @@ curl -X POST "http://localhost:8080/v1/processes/dataImport" \
         "context": { "customerId": "C1234" }
       }'
 ```
+
+If you configured an API key (see [Security](#-security)), add `-H "X-API-KEY: <your key>"`.
 
 **Tip**: Instead of using curl, try the same request in Swagger UI at `http://localhost:8081/` for a better development experience!
 
@@ -328,43 +330,63 @@ docker-compose exec app ./gradlew flywayMigrate
 
 ## 🛡 Security
 
-* All API access is authenticated via **API Keys** (namespace or admin scope).
-* Supports OAuth2 via Cognito/Auth0.
-* Data encrypted in transit & at rest.
+**ToTrackIt is designed to run inside a trusted network.** By default the API is unauthenticated — anyone who can reach it can create, complete, and delete processes. Do **not** expose it directly to the public internet.
+
+Deployment options, from simplest to strongest:
+
+1. **Private network only (default).** Run ToTrackIt behind your VPN/firewall and rely on network-level access control.
+2. **Static API key.** Set the `TOTRACKIT_API_KEY` environment variable and every `/processes` request must carry a matching `X-API-KEY` header. Health, metrics, and API docs endpoints stay open. This is a single shared key for the whole deployment — suitable for one team, not a user-management system.
+3. **Reverse proxy.** Terminate TLS and add your own auth (basic auth, OIDC proxy, etc.) in front of ToTrackIt.
+
+Multi-tenant namespaces, per-user API keys, and SSO are planned for a future managed/enterprise offering and are intentionally not part of the open-source core.
+
+---
+
+## 🔔 Notifications
+
+Set `TOTRACKIT_WEBHOOK_URL` to enable deadline-breach notifications. A background scanner (every 60s by default, tunable via `totrackit.notification-scan-interval`) finds active processes past their deadline and sends each one a single JSON POST:
+
+```json
+{
+  "event": "process.deadline_missed",
+  "name": "dataImport",
+  "id": "batch42",
+  "started_at": 1699990000,
+  "deadline": 1699999999,
+  "tags": [{ "key": "env", "value": "prod" }],
+  "context": { "customerId": "C1234" }
+}
+```
+
+Any 2xx response marks the process as notified; failed deliveries are retried on the next scan. Point it at Slack (via a bridge), your incident tooling, or any HTTP endpoint.
 
 ---
 
 ## 🗺️ Roadmap
 
-### Phase 0 — Core Process API (local-only)
+### Done
 
-* In-memory process storage
-* CRUD + metrics endpoints for processes
-* Minimal testing and docs
+* Core process API: create, get, list (filter/paginate), complete/fail, delete
+* PostgreSQL with Flyway migrations; Docker Compose for dev and prod
+* Observability: health endpoints, Prometheus metrics, Grafana/Alertmanager stack
+* Web UI: dashboard, per-name rollups, tags, metrics
+* Webhook notifications on missed deadlines
+* Optional static API key
 
-### Phase 1 — Kubernetes-ready Service
+### Next (open-source core)
 
-* Docker image + Helm chart/Kustomize
-* Postgres support with migrations
-* Basic observability (logs + Prometheus metrics)
-
-### Phase 2 — UI (MVP)
-
-* Local web UI for starting/viewing/completing processes
-* Basic metrics dashboard
-
-### Phase 3 — Platform Features
-
-* Namespaces, admin API, users, API keys
-* Notification channels (email/webhook)
-* OAuth2 (Cognito/Auth0)
-
-### Later / Nice-to-have
-
-* Slack/OpsGenie/Teams channels
-* OpenTelemetry exporter
+* Email notification channel
+* Helm chart / Kustomize for Kubernetes
 * Advanced analytics (percentiles, time-series)
 * SDKs (Java/TS/Go)
+* OpenTelemetry exporter
+
+### Future (managed / enterprise)
+
+* Namespaces & multi-tenancy
+* Per-user API keys, admin API
+* OAuth2/SSO (Cognito/Auth0)
+* Slack/OpsGenie/Teams channels
 ---
 
 ## 🤝 Contributing

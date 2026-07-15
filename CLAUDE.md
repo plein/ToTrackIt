@@ -81,11 +81,15 @@ src/main/java/com/totrackit/
 ├── entity/           # DB entity: ProcessEntity, enums ProcessStatus / DeadlineStatus
 ├── dto/              # Request/response types: NewProcessRequest, ProcessResponse, PagedResult, ProcessFilter
 ├── mapper/           # ProcessMapper (entity ↔ DTO)
-└── interceptor/      # MetricsInterceptor (HTTP request metrics)
+├── interceptor/      # MetricsInterceptor (HTTP request metrics)
+├── filter/           # ApiKeyFilter (optional static API key, active only when TOTRACKIT_API_KEY is set)
+└── task/             # Scheduled tasks: MetricsUpdateTask, DeadlineNotificationTask (webhook on missed deadline, active only when TOTRACKIT_WEBHOOK_URL is set)
 src/main/resources/
 ├── application*.yml  # Micronaut config per environment
-└── db/migration/     # Flyway migrations (V1 baseline → V2 schema → V3 indexes)
+└── db/migration/     # Flyway migrations (V1 baseline → V2 schema → V3 indexes → V4 namespace_id + deadline_notified_at)
 ```
+
+New columns also need mirroring in `src/test/resources/schema.sql` (H2 test schema).
 
 ### Key Design Decisions
 

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-F4XX4M0CDK"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-F4XX4M0CDK');
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ToTrackIt is an open-source platform to track asynchronous processes and jobs with deadlines. Real-time tracking, webhook notifications on missed deadlines, metrics, and a clean dashboard — self-hosted with Docker.">
+    <title>ToTrackIt - Open-Source Process Tracking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+
+    <link rel="icon" type="image/png" href="images/favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="images/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="images/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="images/favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="images/favicon/site.webmanifest" />
+
+
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container">
+            <a class="navbar-brand" href="#">ToTrackIt</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="#features">Features</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#opensource">Open Source</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#contact">Contact</a></li>
+                    <li class="nav-item"><a class="nav-link" href="https://github.com/plein/ToTrackIt" target="_blank">GitHub</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>Comprehensive Process Tracking Made Easy</h1>
+            <p>Track, manage, and analyze your critical business processes effortlessly with ToTrackIt — open source and self-hosted.</p>
+            <a href="https://github.com/plein/ToTrackIt" target="_blank" class="btn btn-primary">Get Started on GitHub</a>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features-section">
+        <div class="container">
+            <h1 class="text-center mb-5">Features</h1>
+            <div class="row text-center">
+                <div class="col-md-4">
+                    <div class="icon mb-3">📈</div>
+                    <h4>Process Tracking</h4>
+                    <p>Easily register processes and set durations or deadlines to monitor progress in real-time.</p>
+                </div>
+                <div class="col-md-4">
+                    <div class="icon mb-3">🔔</div>
+                    <h4>Webhook Notifications</h4>
+                    <p>Get a webhook notification the moment a deadline is missed, with the process context you need to diagnose issues quickly.</p>
+                </div>
+                <div class="col-md-4">
+                    <div class="icon mb-3">📊</div>
+                    <h4>Metrics & Dashboards</h4>
+                    <p>Measure completion times and missed deadlines in the built-in UI, and scrape Prometheus metrics into Grafana.</p>
+                </div>
+            </div>
+            <div class="row text-center mt-4">
+                <div class="col-md-4">
+                    <div class="icon mb-3">🔍</div>
+                    <h4>Rich Context and Tags</h4>
+                    <p>Add descriptions, context, or customer-specific IDs to each process and assign tags for granular analysis.</p>
+                </div>
+                <div class="col-md-4">
+                    <div class="icon mb-3">🔌</div>
+                    <h4>API-First + Web UI</h4>
+                    <p>Register and complete processes through a REST API with OpenAPI docs, or manage everything from the clean built-in dashboard.</p>
+                </div>
+                <div class="col-md-4">
+                    <div class="icon mb-3">🐳</div>
+                    <h4>Self-Hosted & Open Source</h4>
+                    <p>Run the whole stack with Docker Compose — API, UI, PostgreSQL, and monitoring. Apache 2.0 licensed.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Team Section -->
+    <section id="contact" class="team-section">
+        <div class="container">
+            <h2 class="text-center mb-4">Meet Our Team</h2>
+            <div class="row">
+                <div class="col-md-12 team-member">
+                    <img src="images/jordi_reina_founder.jpg" alt="Jordi Reina">
+                    <h4>Jordi Reina</h4>
+                    <p>CEO & Founder</p>
+                    <a href="https://www.linkedin.com/in/jordireina/" target="_blank" class="btn btn-primary btn-sm">LinkedIn</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Open Source Section -->
+	<section id="opensource" class="features-section">
+	    <div class="container">
+	        <h1 class="text-center mb-5">Free & Open Source</h1>
+	        <div class="text-center">
+	            <p>ToTrackIt is free to self-host under the Apache 2.0 license. A managed offering with team and enterprise features is on the roadmap.</p>
+	            <a href="https://github.com/plein/ToTrackIt" target="_blank" class="btn btn-primary">View on GitHub</a>
+	        </div>
+	    </div>
+	</section>
+
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 ToTrackIt. All rights reserved.</p>
+            <a href="#" class="text">Privacy Policy</a> | <a href="#" class="text">Terms of Service</a>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
