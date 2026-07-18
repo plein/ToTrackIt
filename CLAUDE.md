@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ToTrackIt is an open-source SaaS backend for tracking asynchronous processes and jobs with deadlines, built with **Java 21** and **Micronaut** (lightweight, cloud-native framework). Data is stored in **PostgreSQL 15** with Flyway migrations. Prometheus metrics and health checks are built in.
 
+User-facing reference docs live in `docs/` (api, metrics/Datadog, notifications, configuration, database, security) — the README is a short front door that links into them; keep deep content in `docs/`, not the README.
+
 ## Common Commands
 
 ```bash
