@@ -6,6 +6,7 @@ ToTrackIt exposes Prometheus/OpenMetrics at `/prometheus`. Beyond HTTP and DB me
 |---|---|---|---|
 | `totrackit_processes_overdue_current` | gauge | `process_name` | Active processes currently past their deadline (updated every 30s) |
 | `totrackit_processes_deadline_missed_total` | counter | `process_name` | Deadline breaches, counted once per process |
+| `totrackit_processes_deadline_warning_total` | counter | `process_name` | Runs that crossed the pre-deadline warning threshold (default 75% of budget) |
 | `totrackit_processes_completed_on_time_total` | counter | `process_name` | Completions within the deadline |
 | `totrackit_processes_completed_late_total` | counter | `process_name` | Completions after the deadline |
 | `totrackit_active_processes_current` | gauge | — | All currently active processes |

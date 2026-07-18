@@ -215,6 +215,24 @@ public class MetricsService {
     }
 
     /**
+     * Records that a process crossed its pre-deadline warning threshold.
+     * Incremented once per process, when the scanner first processes it.
+     *
+     * @param processName the name of the at-risk process
+     */
+    public void recordDeadlineWarning(String processName) {
+        try {
+            Counter.builder("totrackit_processes_deadline_warning_total")
+                    .description("Total number of processes that crossed the pre-deadline warning threshold")
+                    .tag("process_name", processName != null ? processName : "unknown")
+                    .register(meterRegistry)
+                    .increment();
+        } catch (Exception e) {
+            LOG.warn("Failed to record deadline warning metric", e);
+        }
+    }
+
+    /**
      * Updates the per-process-name gauge of active processes currently past
      * their deadline. Names missing from the snapshot are reset to zero so a
      * recovered process name doesn't keep alerting.

@@ -45,7 +45,7 @@ your process ──2 API calls──▶ ToTrackIt ──/prometheus──▶ Dat
 * **Works with your alerting.** Deadline-aware metrics (`overdue_current` gauge, missed/on-time/late counters) power stuck-process monitors and metric-based SLOs in Datadog, Prometheus, and Grafana. See the [metrics guide](docs/metrics.md).
 * **Root cause by tags.** The impacted-tags view and `GET /analytics/tags` show which segment (`country`, `channel`, `provider`…) the overdue, late, and failed runs concentrate in, with completion latency (avg/p50/p90/p99) per tag.
 * **Per-process pages & alert deep links.** Every process name has a shareable page (`/?name=account-activation`) with a period picker, impact, and latency breakdowns; webhook alerts link straight to it.
-* **Webhooks for humans and machines.** A JSON POST fires when a deadline is missed, carrying tags, context, and the dashboard deep link. Point it at a pager bridge, or at your own automation: a retry job, an escalation queue, a proactive customer notification. See [notifications](docs/notifications.md).
+* **Webhooks for humans and machines.** Events fire when a run crosses 75% of its deadline budget (`process.deadline_warning`, with `seconds_remaining`) and when it misses the deadline (`process.deadline_missed`), carrying tags, context, and the dashboard deep link. Point them at a pager bridge, or at your own automation: a retry job, an escalation queue, a proactive customer notification, before the breach or after it. See [notifications](docs/notifications.md).
 * **Self-hosted & open source.** One Docker Compose file: API, UI, PostgreSQL. Java 21 + Micronaut. Apache 2.0.
 
 Every process name gets its own page: runs, impact, and the per-tag latency table where slow segments stand out:
@@ -104,11 +104,11 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tes
 * Webhook notifications on missed deadlines (with dashboard deep links)
 * Deadline-aware metrics for Prometheus/Datadog monitors and SLOs
 * Tag-impact analytics with completion latency (avg/p50/p90/p99) overall and per tag
+* Pre-deadline warning events at a configurable threshold, so automation can prevent the breach instead of reacting to it
 * Optional static API key
 
 ### Next (open-source core)
 
-* Pre-deadline warning events: fire at e.g. 75% of the deadline, so automation can prevent the breach instead of reacting to it
 * Webhook signing (HMAC) and per-namespace webhook routing
 * Time-series analytics (trends over time, not just windows)
 * Email notification channel

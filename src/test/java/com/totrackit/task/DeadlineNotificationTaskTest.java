@@ -41,13 +41,27 @@ public class DeadlineNotificationTaskTest {
     @BeforeEach
     void setUp() {
         lenient().when(notificationService.isEnabled()).thenReturn(true);
-        task = new DeadlineNotificationTask(processRepository, metricsService, notificationService);
+        lenient().when(processRepository.findApproachingUnwarned(any(Instant.class)))
+                .thenReturn(Collections.emptyList());
+        lenient().when(processRepository.findOverdueUnnotified(any(Instant.class)))
+                .thenReturn(Collections.emptyList());
+        task = new DeadlineNotificationTask(processRepository, metricsService, notificationService, 0.75);
     }
 
     private ProcessEntity overdueProcess(Long id, String processId) {
         ProcessEntity entity = new ProcessEntity(processId, "test-process");
         entity.setId(id);
         entity.setDeadline(Instant.now().minusSeconds(3600));
+        return entity;
+    }
+
+    /** Active process at the given fraction of its deadline budget. */
+    private ProcessEntity activeProcessAtBudgetFraction(Long id, String processId, double fraction) {
+        ProcessEntity entity = new ProcessEntity(processId, "test-process");
+        entity.setId(id);
+        long budget = 1000;
+        entity.setStartedAt(Instant.now().minusSeconds((long) (budget * fraction)));
+        entity.setDeadline(entity.getStartedAt().plusSeconds(budget));
         return entity;
     }
 
@@ -105,7 +119,7 @@ public class DeadlineNotificationTaskTest {
     void testScanRunsWithoutWebhookAndRecordsMetric() {
         // No webhook configured at all: scanner still processes breaches so the
         // deadline-missed metric works for Prometheus/Datadog-only deployments.
-        task = new DeadlineNotificationTask(processRepository, metricsService, null);
+        task = new DeadlineNotificationTask(processRepository, metricsService, null, 0.75);
         ProcessEntity process = overdueProcess(3L, "proc-3");
         when(processRepository.findOverdueUnnotified(any(Instant.class))).thenReturn(List.of(process));
 
@@ -127,5 +141,62 @@ public class DeadlineNotificationTaskTest {
         verify(notificationService, never()).sendDeadlineMissed(any());
         verify(processRepository).markDeadlineNotified(eq(4L), any(Instant.class));
         verify(metricsService).recordDeadlineMissed("test-process");
+    }
+
+    @Test
+    void testWarningFiredWhenThresholdCrossed() {
+        ProcessEntity atRisk = activeProcessAtBudgetFraction(10L, "proc-w1", 0.8);
+        when(processRepository.findApproachingUnwarned(any(Instant.class))).thenReturn(List.of(atRisk));
+        when(notificationService.sendDeadlineWarning(eq(atRisk), org.mockito.ArgumentMatchers.anyLong())).thenReturn(true);
+
+        task.notifyMissedDeadlines();
+
+        verify(processRepository).markDeadlineWarned(eq(10L), any(Instant.class));
+        verify(metricsService).recordDeadlineWarning("test-process");
+    }
+
+    @Test
+    void testNoWarningBelowThreshold() {
+        ProcessEntity early = activeProcessAtBudgetFraction(11L, "proc-w2", 0.5);
+        when(processRepository.findApproachingUnwarned(any(Instant.class))).thenReturn(List.of(early));
+
+        task.notifyMissedDeadlines();
+
+        verify(notificationService, never()).sendDeadlineWarning(any(), org.mockito.ArgumentMatchers.anyLong());
+        verify(processRepository, never()).markDeadlineWarned(any(), any());
+        verify(metricsService, never()).recordDeadlineWarning(any());
+    }
+
+    @Test
+    void testWarningNotMarkedWhenDeliveryFails() {
+        ProcessEntity atRisk = activeProcessAtBudgetFraction(12L, "proc-w3", 0.9);
+        when(processRepository.findApproachingUnwarned(any(Instant.class))).thenReturn(List.of(atRisk));
+        when(notificationService.sendDeadlineWarning(eq(atRisk), org.mockito.ArgumentMatchers.anyLong())).thenReturn(false);
+
+        task.notifyMissedDeadlines();
+
+        verify(processRepository, never()).markDeadlineWarned(any(), any());
+        verify(metricsService, never()).recordDeadlineWarning(any());
+    }
+
+    @Test
+    void testWarningWithoutWebhookMarksAndRecordsMetric() {
+        task = new DeadlineNotificationTask(processRepository, metricsService, null, 0.75);
+        ProcessEntity atRisk = activeProcessAtBudgetFraction(13L, "proc-w4", 0.8);
+        when(processRepository.findApproachingUnwarned(any(Instant.class))).thenReturn(List.of(atRisk));
+
+        task.notifyMissedDeadlines();
+
+        verify(processRepository).markDeadlineWarned(eq(13L), any(Instant.class));
+        verify(metricsService).recordDeadlineWarning("test-process");
+    }
+
+    @Test
+    void testWarningsDisabledByThreshold() {
+        task = new DeadlineNotificationTask(processRepository, metricsService, notificationService, 0.0);
+
+        task.notifyMissedDeadlines();
+
+        verify(processRepository, never()).findApproachingUnwarned(any(Instant.class));
     }
 }

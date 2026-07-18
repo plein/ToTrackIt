@@ -166,6 +166,27 @@ public interface ProcessRepository extends CrudRepository<ProcessEntity, Long> {
     void markDeadlineNotified(Long id, Instant notifiedAt);
 
     /**
+     * Finds active processes whose deadline is still ahead and that have not
+     * yet had a pre-deadline warning processed. Whether a run has actually
+     * crossed the warning threshold is computed in the service layer.
+     *
+     * @param currentTime the current timestamp to compare against
+     * @return list of active, unwarned processes with a future deadline
+     */
+    @Query("SELECT * FROM processes WHERE status = 'ACTIVE' AND deadline IS NOT NULL AND deadline > :currentTime " +
+           "AND deadline_warned_at IS NULL ORDER BY deadline ASC")
+    List<ProcessEntity> findApproachingUnwarned(Instant currentTime);
+
+    /**
+     * Marks a process as having had its pre-deadline warning processed.
+     *
+     * @param id the internal process ID
+     * @param warnedAt when the warning was processed
+     */
+    @Query("UPDATE processes SET deadline_warned_at = :warnedAt WHERE id = :id")
+    void markDeadlineWarned(Long id, Instant warnedAt);
+
+    /**
      * Finds processes by status.
      * 
      * @param status the process status

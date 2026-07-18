@@ -170,6 +170,14 @@ public class MetricsServiceTest {
     }
 
     @Test
+    public void testRecordDeadlineWarning() {
+        metricsService.recordDeadlineWarning("at-risk-proc");
+
+        assertEquals(1.0, meterRegistry.find("totrackit_processes_deadline_warning_total")
+                .tag("process_name", "at-risk-proc").counter().count());
+    }
+
+    @Test
     public void testOverdueGaugePerNameUpdateAndReset() {
         metricsService.updateOverdueProcessCounts(Map.of("proc-a", 3L, "proc-b", 1L));
 

@@ -175,7 +175,7 @@
                 </div>
                 <div class="card">
                     <h3>A machine reacts</h3>
-                    <p>The deadline-missed webhook carries the run's tags, context, and URL. Point it at a retry job, an escalation queue, or a proactive customer notification.</p>
+                    <p>Webhooks carry the run's tags, context, and URL. A warning event fires at 75% of the deadline budget, so your retry job, escalation queue, or customer notification can act before the breach.</p>
                     <pre class="code"><code>{ <span class="c-key">"event"</span>: <span class="c-str">"process.deadline_missed"</span>,
   <span class="c-key">"tags"</span>: [<span class="c-str">country:DE</span>], <span class="c-key">"context"</span>: { <span class="c-str">customerId</span> },
   <span class="c-key">"url"</span>: <span class="c-str">"…/?process=account-activation/act-9f27"</span> }</code></pre>
@@ -198,7 +198,7 @@
                 <ul class="ticks">
                     <li>Per-process overdue gauge, refreshed every 30s</li>
                     <li>On-time / late / missed counters for SLO math</li>
-                    <li>Webhook with deep link when a deadline is breached</li>
+                    <li>Warning and breach webhooks with deep links, before and after the deadline</li>
                 </ul>
             </div>
             <div class="term" role="img" aria-label="Prometheus scrape output showing ToTrackIt metrics">

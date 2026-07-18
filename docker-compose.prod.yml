@@ -93,6 +93,8 @@ services:
       TOTRACKIT_WEBHOOK_URL: ${TOTRACKIT_WEBHOOK_URL:-}
       # Optional public dashboard URL; adds a deep-link "url" to webhook payloads
       TOTRACKIT_PUBLIC_URL: ${TOTRACKIT_PUBLIC_URL:-}
+      # Pre-deadline warning threshold (fraction of budget, default 0.75)
+      TOTRACKIT_WARNING_THRESHOLD: ${TOTRACKIT_WARNING_THRESHOLD:-0.75}
       
     depends_on:
       postgres:

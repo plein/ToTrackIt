@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS processes (
     context CLOB,
     namespace_id BIGINT,
     deadline_notified_at TIMESTAMP,
+    deadline_warned_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP()
 );

@@ -53,6 +53,9 @@ public class ProcessEntity {
     @MappedProperty("deadline_notified_at")
     private Instant deadlineNotifiedAt;
 
+    @MappedProperty("deadline_warned_at")
+    private Instant deadlineWarnedAt;
+
     @MappedProperty("created_at")
     private Instant createdAt;
     
@@ -155,6 +158,14 @@ public class ProcessEntity {
 
     public void setDeadlineNotifiedAt(Instant deadlineNotifiedAt) {
         this.deadlineNotifiedAt = deadlineNotifiedAt;
+    }
+
+    public Instant getDeadlineWarnedAt() {
+        return deadlineWarnedAt;
+    }
+
+    public void setDeadlineWarnedAt(Instant deadlineWarnedAt) {
+        this.deadlineWarnedAt = deadlineWarnedAt;
     }
 
     public Instant getCreatedAt() {

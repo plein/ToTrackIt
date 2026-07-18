@@ -74,15 +74,34 @@ public class WebhookNotificationService {
      * @return true if the webhook accepted the notification (2xx response)
      */
     public boolean sendDeadlineMissed(ProcessEntity process) {
+        return send("process.deadline_missed", process, null);
+    }
+
+    /**
+     * Notifies the webhook that a process is approaching its deadline, so
+     * receivers can act before the breach.
+     *
+     * @param process the at-risk process
+     * @param secondsRemaining seconds left until the deadline
+     * @return true if the webhook accepted the notification (2xx response)
+     */
+    public boolean sendDeadlineWarning(ProcessEntity process, long secondsRemaining) {
+        return send("process.deadline_warning", process, secondsRemaining);
+    }
+
+    private boolean send(String event, ProcessEntity process, Long secondsRemaining) {
         if (!isEnabled()) {
             return false;
         }
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("event", "process.deadline_missed");
+        payload.put("event", event);
         payload.put("name", process.getName());
         payload.put("id", process.getProcessId());
         payload.put("started_at", process.getStartedAt() != null ? process.getStartedAt().getEpochSecond() : null);
         payload.put("deadline", process.getDeadline() != null ? process.getDeadline().getEpochSecond() : null);
+        if (secondsRemaining != null) {
+            payload.put("seconds_remaining", secondsRemaining);
+        }
         payload.put("tags", parseJsonQuietly(process.getTags()));
         payload.put("context", parseJsonQuietly(process.getContext()));
         String processUrl = buildProcessUrl(process);
@@ -100,8 +119,8 @@ public class WebhookNotificationService {
             }
             return delivered;
         } catch (Exception e) {
-            LOG.warn("Failed to deliver deadline notification for process {}/{}: {}",
-                    process.getName(), process.getProcessId(), e.getMessage());
+            LOG.warn("Failed to deliver {} notification for process {}/{}: {}",
+                    event, process.getName(), process.getProcessId(), e.getMessage());
             return false;
         }
     }

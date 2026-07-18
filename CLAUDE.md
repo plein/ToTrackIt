@@ -85,10 +85,10 @@ src/main/java/com/totrackit/
 ├── mapper/           # ProcessMapper (entity ↔ DTO)
 ├── interceptor/      # MetricsInterceptor (HTTP request metrics)
 ├── filter/           # ApiKeyFilter (optional static API key, active only when TOTRACKIT_API_KEY is set)
-└── task/             # Scheduled tasks: MetricsUpdateTask (gauges incl. per-name overdue), DeadlineNotificationTask (always runs: records deadline-missed metric; also sends webhook when TOTRACKIT_WEBHOOK_URL is set; payload deep-links to the dashboard when TOTRACKIT_PUBLIC_URL is set)
+└── task/             # Scheduled tasks: MetricsUpdateTask (gauges incl. per-name overdue), DeadlineNotificationTask (always runs: fires deadline_warning at totrackit.warning-threshold (default 0.75) and deadline_missed events; records both metrics; sends webhooks when TOTRACKIT_WEBHOOK_URL is set; payload deep-links to the dashboard when TOTRACKIT_PUBLIC_URL is set)
 src/main/resources/
 ├── application*.yml  # Micronaut config per environment
-└── db/migration/     # Flyway migrations (V1 baseline → V2 schema → V3 indexes → V4 namespace_id + deadline_notified_at)
+└── db/migration/     # Flyway migrations (V1 baseline → V2 schema → V3 indexes → V4 namespace_id + deadline_notified_at → V5 deadline_warned_at)
 ```
 
 New columns also need mirroring in `src/test/resources/schema.sql` (H2 test schema).
