@@ -27,24 +27,25 @@
 
 ## Why ToTrackIt
 
-Every company runs async processes with implicit SLOs — account activations, payment settlements, KYC reviews, batch imports. When one silently gets stuck, the customer finds out before you do. ToTrackIt makes those processes first-class: register each run with two API calls (start + complete), give it a deadline, and you get real-time tracking, SLO metrics, and — the part your APM can't do — **root-cause analysis by business tags**.
+Every company runs processes with a deadline someone cares about — account activations, payment settlements, KYC reviews, deliveries, order fulfillment, refunds. When one quietly runs late, the customer finds out before you do. ToTrackIt makes those processes first-class: register each run with two API calls (start + complete), give it a deadline, and you get real-time tracking, deadline metrics, and — the part your APM can't do — **root-cause analysis by business tags**. It works the same whether the deadline is an engineering SLO or a customer promise.
 
-**ToTrackIt is the diagnosis layer, not the pager.** Keep alerting in the stack you already trust: ToTrackIt exposes deadline-shaped Prometheus metrics that plug straight into Datadog monitors, Prometheus alerts, and metric-based SLOs. When an alert fires, its deep link lands on the process page in ToTrackIt — and the impacted-tags view tells you in one glance that all the stuck activations share `country:DE`, and that DE's p90 latency is 9× everyone else's.
+**ToTrackIt watches the clock; you choose what happens when time runs out.** Alerting stays in the stack you already trust — deadline-shaped Prometheus metrics plug straight into Datadog monitors, Prometheus alerts, and metric-based SLOs, and the alert's deep link lands on the process page, where the impacted-tags view tells you in one glance that all the stuck activations share `country:DE` and DE's p90 latency is 9× everyone else's. And the same deadline event fires as a webhook into *your* systems, so a machine can react too: retry the job, escalate to an ops queue, notify the customer proactively. ToTrackIt doesn't run your workflows — it watches the clock on them.
 
 ```
-your process ──2 API calls──▶ ToTrackIt ──/prometheus──▶ Datadog / Prometheus (alerting, SLOs)
-                                  ▲                                  │ alert fires
-                                  └────────── deep link ─────────────┘
+your process ──2 API calls──▶ ToTrackIt ──/prometheus──▶ Datadog / Prometheus (alerts, SLOs)
+                                  │  ▲                               │ alert fires
+                                  │  └───────── deep link ───────────┘
+                                  └──webhook──▶ your automation (retry · escalate · notify customer)
                           "all problems are country:DE" — impacted tags, latency by tag
 ```
 
 ## ✨ Features
 
-* **Process tracking & SLO deadlines** — register runs with IDs, deadlines, tags, and context; deadline status (`ON_TRACK`, `MISSED`, `COMPLETED_ON_TIME`, `COMPLETED_LATE`) is computed in real time.
+* **A deadline on every run** — register runs with IDs, deadlines, tags, and context; deadline status (`ON_TRACK`, `MISSED`, `COMPLETED_ON_TIME`, `COMPLETED_LATE`) is computed in real time.
 * **Works with your alerting** — deadline-aware metrics (`overdue_current` gauge, missed/on-time/late counters) power stuck-process monitors and metric-based SLOs in Datadog, Prometheus, and Grafana. See the [metrics guide](docs/metrics.md).
 * **Root cause by tags** — the impacted-tags view and `GET /analytics/tags` show which segment (`country`, `channel`, `provider`…) the overdue, late, and failed runs concentrate in, with completion latency (avg/p50/p90/p99) per tag.
 * **Per-process pages & alert deep links** — every process name has a shareable page (`/?name=account-activation`) with a period picker, impact, and latency breakdowns; webhook alerts link straight to it.
-* **Webhook notifications** — a JSON POST fires when a deadline is missed, carrying tags, context, and the dashboard deep link. See [notifications](docs/notifications.md).
+* **Webhooks for humans and machines** — a JSON POST fires when a deadline is missed, carrying tags, context, and the dashboard deep link. Point it at a pager bridge, or at your own automation: a retry job, an escalation queue, a proactive customer notification. See [notifications](docs/notifications.md).
 * **Self-hosted & open source** — one Docker Compose file: API, UI, PostgreSQL. Java 21 + Micronaut. Apache 2.0.
 
 Every process name gets its own page — runs, impact, and the per-tag latency table where slow segments stand out:
@@ -107,7 +108,7 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, 
 
 ### Next (open-source core)
 
-* Pre-deadline warning events (notify at e.g. 75% of the SLO, before the customer notices)
+* Pre-deadline warning events — fire at e.g. 75% of the deadline, so automation can prevent the breach instead of reacting to it
 * Webhook signing (HMAC) and per-namespace webhook routing
 * Time-series analytics (trends over time, not just windows)
 * Email notification channel
