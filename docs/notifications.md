@@ -17,7 +17,7 @@ Set `TOTRACKIT_WEBHOOK_URL` to enable deadline-breach notifications. A backgroun
 
 Any 2xx response marks the process as notified; failed deliveries are retried on the next scan. Point it at Slack (via a bridge), your incident tooling, or any HTTP endpoint.
 
-The `url` field is included when `TOTRACKIT_PUBLIC_URL` is set to the public base URL of the dashboard — it deep-links straight to the impacted process, so whoever receives the alert is one click away from the process page and the impacted-tags view.
+The `url` field is included when `TOTRACKIT_PUBLIC_URL` is set to the public base URL of the dashboard. It deep-links straight to the impacted process, so whoever receives the alert is one click away from the process page and the impacted-tags view.
 
 The deadline scanner runs regardless of webhook configuration; it also feeds the `totrackit_processes_deadline_missed_total` metric (see [Metrics](metrics.md)).
 

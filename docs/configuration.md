@@ -5,8 +5,8 @@
 Micronaut environment is selected with `MICRONAUT_ENVIRONMENTS`:
 
 - **Default**: `application.yml`
-- **Local development**: `application-local.yml` — `MICRONAUT_ENVIRONMENTS=local ./gradlew run`
-- **Docker**: `application-docker.yml` — set automatically by the compose files
+- **Local development**: `application-local.yml`, run with `MICRONAUT_ENVIRONMENTS=local ./gradlew run`
+- **Docker**: `application-docker.yml`, set automatically by the compose files
 
 ## Environment variables
 

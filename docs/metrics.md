@@ -22,7 +22,7 @@ ToTrackIt exposes Prometheus/OpenMetrics at `/prometheus`. Beyond HTTP and DB me
 
 ## Datadog
 
-The Datadog Agent scrapes `/prometheus` natively via its OpenMetrics integration — add to `conf.d/openmetrics.d/conf.yaml`:
+The Datadog Agent scrapes `/prometheus` natively via its OpenMetrics integration. Add to `conf.d/openmetrics.d/conf.yaml`:
 
 ```yaml
 instances:
@@ -34,7 +34,7 @@ instances:
 
 Typical monitors:
 
-* **Stuck processes** — metric monitor on `totrackit.processes_overdue_current` `> 0` by `process_name`. Fires while anything is past its deadline; resolves when the backlog clears.
-* **SLO / on-time rate** — create a Datadog metric-based SLO with good events = `completed_on_time_total` and total events = `completed_on_time_total + completed_late_total + deadline_missed_total`. This gives you error budgets and burn-rate alerts on e.g. "99% of account activations complete within 1 hour".
+* **Stuck processes.** A metric monitor on `totrackit.processes_overdue_current` `> 0` by `process_name`. Fires while anything is past its deadline; resolves when the backlog clears.
+* **SLO / on-time rate.** Create a Datadog metric-based SLO with good events = `completed_on_time_total` and total events = `completed_on_time_total + completed_late_total + deadline_missed_total`. This gives you error budgets and burn-rate alerts on e.g. "99% of account activations complete within 1 hour".
 
-When a monitor fires, the dashboard's **Impacted tags** panel (and `GET /analytics/tags`) shows which segment — country, locale, provider — the overdue and late processes are concentrated in.
+When a monitor fires, the dashboard's **Impacted tags** panel (and `GET /analytics/tags`) shows which segment (country, locale, provider) the overdue and late processes are concentrated in.

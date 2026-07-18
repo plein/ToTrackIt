@@ -48,7 +48,7 @@ Visit http://localhost:8080/swagger-ui
 docker-compose up -d
 ```
 
-Visit http://localhost:8081 — browse all endpoints, test calls from the browser, and use the "Authorize" button to add your API key.
+Visit http://localhost:8081 to browse all endpoints, test calls from the browser, and use the "Authorize" button to add your API key.
 
 **Option 3: Raw OpenAPI specification**
 

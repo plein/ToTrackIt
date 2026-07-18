@@ -13,7 +13,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Open-source deadline tracking and root-cause analytics for business processes. Track activations, payments, KYC, and deliveries against their deadlines, alert via Datadog or Prometheus, diagnose incidents by tag, and trigger automation via webhooks. Self-hosted with Docker.">
-    <title>ToTrackIt — Deadline Tracking & Root-Cause Analytics for Async Processes</title>
+    <title>ToTrackIt: Deadline Tracking & Root-Cause Analytics for Async Processes</title>
 
     <link rel="canonical" href="https://totrackit.com/">
 
@@ -21,11 +21,11 @@
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="ToTrackIt">
     <meta property="og:url" content="https://totrackit.com/">
-    <meta property="og:title" content="ToTrackIt — Every process has a deadline. Know when it slips, and why.">
+    <meta property="og:title" content="ToTrackIt: Every process has a deadline. Know when it slips, and why.">
     <meta property="og:description" content="Open-source deadline tracking and root-cause analytics for business processes. Alerts through Datadog/Prometheus, diagnoses incidents by tag, triggers automation via webhooks. Self-hosted.">
     <meta property="og:image" content="https://totrackit.com/images/favicon/apple-touch-icon.png">
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="ToTrackIt — Every process has a deadline. Know when it slips, and why.">
+    <meta name="twitter:title" content="ToTrackIt: Every process has a deadline. Know when it slips, and why.">
     <meta name="twitter:description" content="Open-source deadline tracking and root-cause analytics for business processes. Alerts through Datadog/Prometheus, diagnoses incidents by tag, triggers automation via webhooks. Self-hosted.">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -61,9 +61,9 @@
         <div class="container hero__grid">
             <div class="hero__copy">
                 <p class="eyebrow">Open source · Apache 2.0 · Self-hosted</p>
-                <h1>Every process has a deadline.<br><em>Know when it slips — and why.</em></h1>
+                <h1>Every process has a deadline.<br><em>Know when it slips. And why.</em></h1>
                 <p class="hero__sub">
-                    Account activations, payments, KYC checks, deliveries — when they quietly run
+                    Account activations, payments, KYC checks, deliveries. When they quietly run
                     late, customers notice first. ToTrackIt tracks every run against its deadline,
                     shows which country, channel, or provider the problem is hiding in, and fires
                     an event so your systems can react before the customer does.
@@ -72,7 +72,7 @@
                     <a class="btn btn--primary" href="https://github.com/plein/ToTrackIt" target="_blank" rel="noopener">View on GitHub</a>
                     <code class="cmd" title="Full stack: API, UI, PostgreSQL">docker compose up -d</code>
                 </div>
-                <p class="hero__note">Alerts stay in your stack — Datadog, Prometheus, Grafana. Automation stays in yours. ToTrackIt watches the clock.</p>
+                <p class="hero__note">Alerts stay in your stack: Datadog, Prometheus, Grafana. Automation stays in yours. ToTrackIt watches the clock.</p>
             </div>
 
             <!-- Signature: CSS-only incident replay -->
@@ -114,7 +114,7 @@
                     <span class="diag__count">0 problems</span>
                 </div>
                 <div class="incident__foot reveal r4">
-                    <span class="mono">p90 latency — DE 78m · FR 9m</span>
+                    <span class="mono">p90 latency: DE 78m · FR 9m</span>
                 </div>
             </div>
         </div>
@@ -140,7 +140,7 @@
                 <div class="step">
                     <div class="step__n">2</div>
                     <h3>Alert where you already page</h3>
-                    <p>ToTrackIt exposes deadline-shaped Prometheus metrics. Point a Datadog monitor or Prometheus alert at them — no new pager, no migration.</p>
+                    <p>ToTrackIt exposes deadline-shaped Prometheus metrics. Point a Datadog monitor or Prometheus alert at them. No new pager, no migration.</p>
                     <div class="metric-chips">
                         <code>processes_overdue_current</code>
                         <code>deadline_missed_total</code>
@@ -151,7 +151,7 @@
                 <div class="step">
                     <div class="step__n">3</div>
                     <h3>Diagnose in one glance</h3>
-                    <p>The alert's deep link lands on the process page: every run in the period, impacted tags, and completion latency by segment — avg, p50, p90, p99.</p>
+                    <p>The alert's deep link lands on the process page: every run in the period, impacted tags, and completion latency by segment: avg, p50, p90, p99.</p>
                     <pre class="code"><code><span class="c-muted"># from the alert payload</span>
 <span class="c-key">"url"</span>: <span class="c-str">"https://totrackit.you.com/?name=account-activation"</span></code></pre>
                 </div>
@@ -165,13 +165,13 @@
             <p class="eyebrow">When time runs low</p>
             <h2>Page a human. Or trigger a machine.</h2>
             <p class="section__sub">
-                The same deadline event serves both. ToTrackIt doesn't run your workflows —
-                it watches the clock on them, and fires when time runs out.
+                The same deadline event serves both. ToTrackIt doesn't run your workflows.
+                It watches the clock on them and fires when time runs out.
             </p>
             <div class="react-grid">
                 <div class="card">
                     <h3>A human reacts</h3>
-                    <p>A Datadog or Prometheus monitor fires on the overdue gauge. The alert's deep link lands the on-call on the process page — impacted tags, latency by segment, every run.</p>
+                    <p>A Datadog or Prometheus monitor fires on the overdue gauge. The alert's deep link lands the on-call on the process page: impacted tags, latency by segment, every run.</p>
                 </div>
                 <div class="card">
                     <h3>A machine reacts</h3>
@@ -192,7 +192,7 @@
                 <h2>Speaks fluent Prometheus</h2>
                 <p class="section__sub">
                     Scrape <code class="inline">/prometheus</code> with the Datadog Agent or Prometheus.
-                    Build a metric-based SLO — "99% of activations complete within 1 hour" — with
+                    Build a metric-based SLO like "99% of activations complete within 1 hour", with
                     error budgets and burn-rate alerts in the tool your team already trusts.
                 </p>
                 <ul class="ticks">
@@ -220,7 +220,7 @@
             <div class="cards">
                 <div class="card">
                     <h3>A deadline on every run</h3>
-                    <p>On-track, missed, on-time, late — computed in real time from timestamps, never stale. Works for engineering SLOs and customer SLAs alike.</p>
+                    <p>On-track, missed, on-time, or late, computed in real time from timestamps. Never stale. Works for engineering SLOs and customer SLAs alike.</p>
                 </div>
                 <div class="card">
                     <h3>Root cause by tags</h3>
@@ -236,7 +236,7 @@
                 </div>
                 <div class="card">
                     <h3>Webhooks for humans and machines</h3>
-                    <p>Deadline events carry tags, context, and a deep link — ready for a pager bridge or your own automation.</p>
+                    <p>Deadline events carry tags, context, and a deep link, ready for a pager bridge or your own automation.</p>
                 </div>
                 <div class="card">
                     <h3>Self-hosted, Apache 2.0</h3>
