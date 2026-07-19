@@ -21,6 +21,7 @@ Copy `.env.example` to `.env` before running Docker Compose. Key variables:
 | `TOTRACKIT_API_KEY` | Optional static API key (see [Security](security.md)) |
 | `TOTRACKIT_WEBHOOK_URL` | Optional deadline-missed webhook (see [Notifications](notifications.md)) |
 | `TOTRACKIT_PUBLIC_URL` | Public dashboard URL; adds deep links to webhook payloads |
+| `TOTRACKIT_NOTIFICATION_BATCH_SIZE` | Max deadline events processed per scan cycle (default 500, see [Notifications](notifications.md)) |
 | `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` | Monitoring stack credentials |
 
 ## Docker development

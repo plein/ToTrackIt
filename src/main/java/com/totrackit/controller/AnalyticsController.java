@@ -1,5 +1,8 @@
 package com.totrackit.controller;
 
+import com.totrackit.dto.NameRollupEntry;
+import com.totrackit.dto.PagedResult;
+import com.totrackit.dto.SummaryResponse;
 import com.totrackit.dto.TagImpactResponse;
 import com.totrackit.service.AnalyticsService;
 import io.micronaut.core.annotation.Nullable;
@@ -56,5 +59,40 @@ public class AnalyticsController {
 
         LOG.debug("Computing tag impact: name={}, windowHours={}", name, windowHours);
         return HttpResponse.ok(analyticsService.getTagImpact(name, windowHours));
+    }
+
+    @Get("/summary")
+    @Operation(
+        summary = "Workspace summary",
+        description = "Headline counts across all processes (status totals, deadline outcomes, "
+                + "last-24h completions) aggregated in a single query."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Workspace-wide summary counts",
+        content = @Content(schema = @Schema(implementation = SummaryResponse.class))
+    )
+    public HttpResponse<SummaryResponse> summary() {
+        return HttpResponse.ok(analyticsService.getSummary());
+    }
+
+    @Get("/names")
+    @Operation(
+        summary = "Per-name rollups",
+        description = "Aggregated run counts per process name (GROUP BY in SQL), busiest names first."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Paginated per-name rollups",
+        content = @Content(schema = @Schema(implementation = PagedResult.class))
+    )
+    public HttpResponse<PagedResult<NameRollupEntry>> names(
+            @Parameter(description = "Maximum number of names (1-100)")
+            @QueryValue(defaultValue = "20") @Min(1) @Max(100) int limit,
+
+            @Parameter(description = "Number of names to skip")
+            @QueryValue(defaultValue = "0") @Min(0) int offset) {
+
+        return HttpResponse.ok(analyticsService.getNameRollups(limit, offset));
     }
 }

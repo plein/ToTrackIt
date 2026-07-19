@@ -1,9 +1,13 @@
 package com.totrackit.controller;
 
+import com.totrackit.dto.NameRollupEntry;
+import com.totrackit.dto.PagedResult;
+import com.totrackit.dto.SummaryResponse;
 import com.totrackit.dto.TagImpactResponse;
 import com.totrackit.entity.ProcessEntity;
 import com.totrackit.model.ProcessStatus;
 import com.totrackit.repository.ProcessRepository;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
@@ -114,5 +118,130 @@ class AnalyticsControllerIntegrationTest implements TestPropertyProvider {
         assertEquals(0, response.getTotalProcesses());
         // Serde's NON_EMPTY inclusion omits the empty array entirely
         assertTrue(response.getTags() == null || response.getTags().isEmpty());
+    }
+
+    /** Seeds a completed run with an explicit start so the duration is exact. */
+    private void seedCompleted(String name, String id, long durationSeconds, boolean onTime, String tagsJson) {
+        Instant completedAt = Instant.now().minusSeconds(60);
+        ProcessEntity entity = new ProcessEntity(id, name);
+        entity.setStatus(ProcessStatus.COMPLETED);
+        entity.setStartedAt(completedAt.minusSeconds(durationSeconds));
+        entity.setCompletedAt(completedAt);
+        entity.setDeadline(onTime ? completedAt.plusSeconds(600) : completedAt.minusSeconds(600));
+        entity.setTags(tagsJson);
+        processRepository.save(entity);
+    }
+
+    @Test
+    void testDurationStatsFromSql() {
+        String name = "analytics-duration-test";
+        String tags = "[{\"key\":\"country\",\"value\":\"DE\"}]";
+        seedCompleted(name, "d100", 100, true, tags);
+        seedCompleted(name, "d300", 300, true, tags);
+
+        TagImpactResponse response = client.toBlocking().retrieve(
+                HttpRequest.GET("/analytics/tags?name=" + name + "&window_hours=24"),
+                TagImpactResponse.class);
+
+        assertEquals(2, response.getTotalProcesses());
+        assertEquals(0, response.getProblemProcesses());
+        assertNotNull(response.getDuration());
+        assertEquals(2, response.getDuration().getCount());
+        assertEquals(200.0, response.getDuration().getAvgSeconds(), 0.5);
+        // percentile_cont interpolates between ranks; only bound the range
+        assertTrue(response.getDuration().getP50Seconds() >= 100 && response.getDuration().getP50Seconds() <= 300);
+        assertTrue(response.getDuration().getP99Seconds() <= 300.5);
+
+        assertEquals(1, response.getTags().size());
+        assertNotNull(response.getTags().get(0).getDuration());
+        assertEquals(2, response.getTags().get(0).getDuration().getCount());
+    }
+
+    @Test
+    void testWindowExcludesOldFinishedRuns() {
+        String name = "analytics-window-test";
+        Instant now = Instant.now();
+        // Finished 48h ago: outside a 24h window
+        ProcessEntity old = new ProcessEntity("old-run", name);
+        old.setStatus(ProcessStatus.COMPLETED);
+        old.setStartedAt(now.minusSeconds(50 * 3600));
+        old.setCompletedAt(now.minusSeconds(48 * 3600));
+        processRepository.save(old);
+        // Active runs are always in scope, regardless of age
+        seed(name, "active-run", ProcessStatus.ACTIVE, now.plusSeconds(3600), null, null);
+
+        TagImpactResponse day = client.toBlocking().retrieve(
+                HttpRequest.GET("/analytics/tags?name=" + name + "&window_hours=24"),
+                TagImpactResponse.class);
+        assertEquals(1, day.getTotalProcesses());
+
+        TagImpactResponse week = client.toBlocking().retrieve(
+                HttpRequest.GET("/analytics/tags?name=" + name + "&window_hours=168"),
+                TagImpactResponse.class);
+        assertEquals(2, week.getTotalProcesses());
+    }
+
+    @Test
+    void testFailedRunsCountAsProblems() {
+        String name = "analytics-failed-test";
+        Instant now = Instant.now();
+        seed(name, "failed-run", ProcessStatus.FAILED, null, now.minusSeconds(120),
+                "[{\"key\":\"provider\",\"value\":\"acme\"}]");
+
+        TagImpactResponse response = client.toBlocking().retrieve(
+                HttpRequest.GET("/analytics/tags?name=" + name + "&window_hours=24"),
+                TagImpactResponse.class);
+
+        assertEquals(1, response.getTotalProcesses());
+        assertEquals(1, response.getProblemProcesses());
+        assertEquals(1, response.getTags().get(0).getFailed());
+        assertEquals(1, response.getTags().get(0).getProblems());
+        // Failed runs contribute no completion-duration stats
+        assertTrue(response.getDuration() == null || response.getDuration().getCount() == 0);
+    }
+
+    @Test
+    void testSummaryEndpoint() {
+        String name = "analytics-summary-test";
+        Instant now = Instant.now();
+        seed(name, "sum-overdue", ProcessStatus.ACTIVE, now.minusSeconds(600), null, null);
+        seedCompleted(name, "sum-on-time", 120, true, null);
+
+        SummaryResponse summary = client.toBlocking().retrieve(
+                HttpRequest.GET("/analytics/summary"), SummaryResponse.class);
+
+        assertTrue(summary.getTotal() >= 2);
+        assertTrue(summary.getActive() >= 1);
+        assertTrue(summary.getOverdue() >= 1);
+        assertTrue(summary.getCompleted() >= 1);
+        assertTrue(summary.getCompletedOnTime() >= 1);
+        assertTrue(summary.getCompleted24h() >= 1);
+        assertTrue(summary.getGeneratedAt() > 0);
+    }
+
+    @Test
+    void testNamesRollupEndpoint() {
+        String name = "analytics-names-test";
+        Instant now = Instant.now();
+        seed(name, "nr-overdue", ProcessStatus.ACTIVE, now.minusSeconds(600), null, null);
+        seedCompleted(name, "nr-late", 120, false, null);
+
+        PagedResult<NameRollupEntry> result = client.toBlocking().retrieve(
+                HttpRequest.GET("/analytics/names?limit=100&offset=0"),
+                Argument.of(PagedResult.class, NameRollupEntry.class));
+
+        NameRollupEntry entry = result.getData().stream()
+                .filter(e -> name.equals(e.getName()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("expected a rollup entry for " + name));
+
+        assertEquals(2, entry.getTotal());
+        assertEquals(1, entry.getActive());
+        assertEquals(1, entry.getOverdue());
+        assertEquals(1, entry.getCompleted());
+        assertEquals(1, entry.getCompletedLate());
+        assertEquals(0, entry.getCompletedOnTime());
+        assertNotNull(entry.getLastStartedAt());
+        assertTrue(result.getTotal() >= 1);
     }
 }

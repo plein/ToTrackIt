@@ -5,11 +5,15 @@ ToTrackIt exposes a **REST API** (OpenAPI 3.1). The specification is generated f
 ## Key endpoints
 
 * `POST /processes/{name}` → Start a process
-* `GET /processes` → List processes (filtering + pagination)
+* `GET /processes` → List processes (filtering + pagination; all filtering, sorting and paging happen in SQL, so it stays fast at millions of rows)
 * `GET /processes/{name}/{id}` → Get a single process
 * `PUT /processes/{name}/{id}/complete` → Mark process as completed (or failed)
 * `DELETE /processes/{name}/{id}` → Delete a process
 * `GET /analytics/tags` → Per-tag breakdown of deadline outcomes and completion latency (avg/p50/p90/p99), overall and per tag
+* `GET /analytics/summary` → Workspace-wide headline counts (status totals, deadline outcomes, last-24h completions) in one aggregate query
+* `GET /analytics/names` → Paginated per-name run rollups (GROUP BY in SQL), busiest names first
+
+The `tags` filter on `GET /processes` accepts multiple comma-separated pairs (`tags=country:DE,channel:web`), AND-composed and matched via JSONB containment against the GIN index.
 
 ## Example: track a process
 

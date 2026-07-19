@@ -32,6 +32,10 @@ datasources:
     password: totrackit
     driver-class-name: org.postgresql.Driver
     maximum-pool-size: 10
+    data-source-properties:
+      # Kill any runaway query before it can pin a pooled connection.
+      options: "-c statement_timeout=15000"
+      defaultRowFetchSize: 500
 
 flyway:
   datasources:
@@ -44,7 +48,6 @@ flyway:
 logger:
   levels:
     com.totrackit: DEBUG
-    io.micronaut.data: DEBUG
 
 endpoints:
   all:

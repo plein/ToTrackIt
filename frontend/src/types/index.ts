@@ -40,6 +40,7 @@ export interface CompleteProcessRequest {
 
 export interface ProcessFilter {
   name?: string
+  id?: string
   status?: ProcessStatus
   deadline_status?: DeadlineStatus
   deadline_before?: number
@@ -49,6 +50,33 @@ export interface ProcessFilter {
   limit?: number
   offset?: number
   tags?: string
+}
+
+export interface SummaryResponse {
+  generated_at: number
+  total: number
+  active: number
+  completed: number
+  failed: number
+  overdue: number
+  on_track: number
+  completed_on_time: number
+  completed_late: number
+  completed_24h: number
+  completed_on_time_24h: number
+  failed_24h: number
+}
+
+export interface NameRollupEntry {
+  name: string
+  total: number
+  active: number
+  failed: number
+  overdue: number
+  completed: number
+  completed_on_time: number
+  completed_late: number
+  last_started_at: number | null
 }
 
 export interface DurationStats {

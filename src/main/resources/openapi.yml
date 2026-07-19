@@ -21,6 +21,56 @@ tags:
 - name: Analytics
   description: Aggregated statistics across processes
 paths:
+  /analytics/names:
+    get:
+      tags:
+      - Analytics
+      summary: Per-name rollups
+      description: "Aggregated run counts per process name (GROUP BY in SQL), busiest\
+        \ names first."
+      operationId: names
+      parameters:
+      - name: limit
+        in: query
+        description: Maximum number of names (1-100)
+        required: true
+        schema:
+          maximum: 100
+          minimum: 1
+          type: integer
+          format: int32
+          default: 20
+      - name: offset
+        in: query
+        description: Number of names to skip
+        required: true
+        schema:
+          minimum: 0
+          type: integer
+          format: int32
+          default: 0
+      responses:
+        "200":
+          description: Paginated per-name rollups
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResult_Object_'
+  /analytics/summary:
+    get:
+      tags:
+      - Analytics
+      summary: Workspace summary
+      description: "Headline counts across all processes (status totals, deadline\
+        \ outcomes, last-24h completions) aggregated in a single query."
+      operationId: summary
+      responses:
+        "200":
+          description: Workspace-wide summary counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryResponse'
   /analytics/tags:
     get:
       tags:
@@ -522,6 +572,50 @@ components:
           type: string
       description: Represents a tag associated with a process for categorization and
         filtering.
+    SummaryResponse:
+      type: object
+      properties:
+        generated_at:
+          type: integer
+          format: int64
+        total:
+          type: integer
+          format: int64
+        active:
+          type: integer
+          format: int64
+        completed:
+          type: integer
+          format: int64
+        failed:
+          type: integer
+          format: int64
+        overdue:
+          type: integer
+          description: Active processes currently past their deadline.
+          format: int64
+        on_track:
+          type: integer
+          description: Active processes with a deadline still ahead.
+          format: int64
+        completed_on_time:
+          type: integer
+          format: int64
+        completed_late:
+          type: integer
+          format: int64
+        completed_24h:
+          type: integer
+          format: int64
+        completed_on_time_24h:
+          type: integer
+          format: int64
+        failed_24h:
+          type: integer
+          format: int64
+      description: "Workspace-wide headline stats, aggregated in one SQL pass. Powers\
+        \ the dashboard stat cards, sidebar counts, and the Metrics page without the\
+        \ UI having to page through the process list."
     TagImpactEntry:
       type: object
       properties:

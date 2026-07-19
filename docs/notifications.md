@@ -45,4 +45,10 @@ The `url` field is included when `TOTRACKIT_PUBLIC_URL` is set to the public bas
 
 The deadline scanner runs regardless of webhook configuration; it also feeds the `totrackit_processes_deadline_missed_total` and `totrackit_processes_deadline_warning_total` metrics (see [Metrics](metrics.md)).
 
+## Delivery semantics at scale
+
+Each scan processes at most `totrackit.notification-batch-size` events per pass (default 500), oldest deadline first; anything beyond the batch is picked up on the next scan. A process is only marked processed after its webhook delivery succeeds, so failed deliveries are retried on the next scan. If five deliveries in a row fail, the pass aborts early instead of hammering a dead endpoint for the whole batch; the `totrackit_notifications_backlog` gauge (see [Metrics](metrics.md)) tells you how many events are waiting, so you can alert on a receiver that stays down.
+
+When multiple API replicas share one database, a PostgreSQL advisory lock ensures only one replica scans at a time, so events never fire twice.
+
 Email and other notification channels are on the [roadmap](../README.md#%EF%B8%8F-roadmap).

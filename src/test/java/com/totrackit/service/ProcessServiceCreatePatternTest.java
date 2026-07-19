@@ -6,6 +6,7 @@ import com.totrackit.entity.ProcessEntity;
 import com.totrackit.exception.ProcessAlreadyExistsException;
 import com.totrackit.model.ProcessStatus;
 import com.totrackit.model.ProcessTag;
+import com.totrackit.repository.ProcessQueryRepository;
 import com.totrackit.repository.ProcessRepository;
 import com.totrackit.service.MetricsService;
 import com.totrackit.util.ProcessMapper;
@@ -29,6 +30,9 @@ class ProcessServiceCreatePatternTest {
     
     @Mock
     private ProcessRepository processRepository;
+
+    @Mock
+    private ProcessQueryRepository processQueryRepository;
     
     @Mock
     private ProcessMapper processMapper;
@@ -41,7 +45,7 @@ class ProcessServiceCreatePatternTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        processService = new ProcessService(processRepository, processMapper, metricsService);
+        processService = new ProcessService(processRepository, processQueryRepository, processMapper, metricsService);
     }
     
     @Test

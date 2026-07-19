@@ -1,12 +1,10 @@
-import { useQuery } from '@tanstack/react-query'
-import { listProcesses } from '@/api/processes'
-import type { ProcessResponse } from '@/types'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import { Icon } from '@/components/Icon'
 import { StatusPill } from '@/components/StatusPill'
 import { fmtRelative } from '@/lib/format'
+import { useSummary, useProcessList } from '@/hooks/useProcesses'
 
 const now = () => Math.floor(Date.now() / 1000)
 
@@ -18,58 +16,30 @@ const DEADLINE_COLORS: Record<string, string> = {
   COMPLETED_LATE: 'oklch(0.6 0.15 70)',
 }
 
-async function fetchAllForMetrics() {
-  let offset = 0
-  const all: ProcessResponse[] = []
-  while (true) {
-    const page = await listProcesses({ limit: 100, offset })
-    all.push(...page.data)
-    if (!page.has_more) break
-    offset += 100
-  }
-  return all
-}
-
-function useAllProcesses() {
-  return useQuery({
-    queryKey: ['processes-all-metrics'],
-    queryFn: fetchAllForMetrics,
-    staleTime: 30_000,
-  })
-}
-
-function aggregate(processes: ProcessResponse[]) {
-  const statusCounts = { ACTIVE: 0, COMPLETED: 0, FAILED: 0 }
-  const deadlineCounts: Record<string, number> = {
-    ON_TRACK: 0, MISSED: 0, COMPLETED_ON_TIME: 0, COMPLETED_LATE: 0,
-  }
-  let missedCount = 0
-  let completedLast24h = 0
-  let completedOnTimeCount = 0
-  const n = Date.now() / 1000
-
-  for (const p of processes) {
-    statusCounts[p.status]++
-    if (p.deadline_status) deadlineCounts[p.deadline_status]++
-    if (p.deadline_status === 'MISSED') missedCount++
-    if (p.completed_at && n - p.completed_at < 86400) {
-      completedLast24h++
-      if (p.deadline_status === 'COMPLETED_ON_TIME') completedOnTimeCount++
-    }
-  }
-
-  const completionRate = completedLast24h > 0
-    ? Math.round((completedOnTimeCount / completedLast24h) * 100)
-    : null
-
-  return { statusCounts, deadlineCounts, missedCount, completedLast24h, completionRate }
-}
-
+// All aggregation happens server-side in /analytics/summary; the recent
+// activity list is one bounded page of the newest runs.
 export function Metrics() {
-  const { data, isFetching, refetch } = useAllProcesses()
-  const processes = data ?? []
-  const { statusCounts, deadlineCounts, missedCount, completedLast24h, completionRate } = aggregate(processes)
+  const { data: summary, isFetching, refetch } = useSummary()
+  const { data: recentPage } = useProcessList({ sort_by: 'started_at:desc', limit: 10 })
+  const recent = recentPage?.data ?? []
   const n = now()
+
+  const statusCounts = {
+    ACTIVE: summary?.active ?? 0,
+    COMPLETED: summary?.completed ?? 0,
+    FAILED: summary?.failed ?? 0,
+  }
+  const deadlineCounts: Record<string, number> = {
+    ON_TRACK: summary?.on_track ?? 0,
+    MISSED: summary?.overdue ?? 0,
+    COMPLETED_ON_TIME: summary?.completed_on_time ?? 0,
+    COMPLETED_LATE: summary?.completed_late ?? 0,
+  }
+  const missedCount = summary?.overdue ?? 0
+  const completedLast24h = summary?.completed_24h ?? 0
+  const completionRate = summary && summary.completed_24h > 0
+    ? Math.round((summary.completed_on_time_24h / summary.completed_24h) * 100)
+    : null
 
   const statusData = Object.entries(statusCounts)
     .filter(([, v]) => v > 0)
@@ -174,13 +144,13 @@ export function Metrics() {
 
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontSize: '13px', fontWeight: 600, color: 'var(--text-2)' }}>Recent Activity</div>
-        {processes.length === 0 ? (
+        {recent.length === 0 ? (
           <div className="tti-empty" style={{ padding: '32px 0' }}>
             <div className="tti-empty__title">No processes yet</div>
           </div>
         ) : (
           <div className="tti-kv">
-            {processes.slice(0, 10).map((p) => (
+            {recent.map((p) => (
               <div key={`${p.name}-${p.id}`} className="tti-kv__row" style={{ alignItems: 'center' }}>
                 <div className="tti-kv__k" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   <span>{p.name}</span>

@@ -29,10 +29,15 @@ public class MetricsService {
     
     private final MeterRegistry meterRegistry;
 
+    /** Keep at most this many per-name overdue gauge series registered. */
+    private static final int MAX_OVERDUE_NAME_SERIES = 100;
+
     // Gauges must reference a live object; re-registering with a boxed number
     // binds the gauge to the first value forever. These holders are updated
     // in place and strongly referenced for the lifetime of the service.
     private final AtomicLong activeProcesses = new AtomicLong();
+    private final AtomicLong missedNotificationBacklog = new AtomicLong();
+    private final AtomicLong warningNotificationBacklog = new AtomicLong();
     private final ConcurrentHashMap<String, AtomicLong> overdueByName = new ConcurrentHashMap<>();
 
     @Inject
@@ -40,6 +45,14 @@ public class MetricsService {
         this.meterRegistry = meterRegistry;
         Gauge.builder("totrackit_active_processes_current", activeProcesses, AtomicLong::get)
                 .description("Current number of active processes")
+                .register(meterRegistry);
+        Gauge.builder("totrackit_notifications_backlog", missedNotificationBacklog, AtomicLong::get)
+                .description("Deadline events not yet processed (e.g. webhook deliveries still failing)")
+                .tag("event", "deadline_missed")
+                .register(meterRegistry);
+        Gauge.builder("totrackit_notifications_backlog", warningNotificationBacklog, AtomicLong::get)
+                .description("Deadline events not yet processed (e.g. webhook deliveries still failing)")
+                .tag("event", "deadline_warning")
                 .register(meterRegistry);
     }
     
@@ -247,9 +260,38 @@ public class MetricsService {
                     holder.set(0);
                 }
             });
+            // Bound series cardinality: once more names have been seen than the
+            // cap, drop the zeroed series instead of exporting them forever.
+            // process_name labels assume low-cardinality names by design.
+            if (overdueByName.size() > MAX_OVERDUE_NAME_SERIES) {
+                overdueByName.entrySet().removeIf(entry -> {
+                    if (countsByName.containsKey(entry.getKey()) || entry.getValue().get() != 0) {
+                        return false;
+                    }
+                    Gauge gauge = meterRegistry.find("totrackit_processes_overdue_current")
+                            .tag("process_name", entry.getKey())
+                            .gauge();
+                    if (gauge != null) {
+                        meterRegistry.remove(gauge);
+                    }
+                    return true;
+                });
+            }
         } catch (Exception e) {
             LOG.warn("Failed to update overdue process gauges", e);
         }
+    }
+
+    /**
+     * Updates the backlog gauges of deadline events awaiting processing,
+     * published once per notification scan cycle.
+     *
+     * @param missedBacklog overdue processes not yet notified
+     * @param warningBacklog at-risk processes not yet warned
+     */
+    public void updateNotificationBacklog(long missedBacklog, long warningBacklog) {
+        missedNotificationBacklog.set(missedBacklog);
+        warningNotificationBacklog.set(warningBacklog);
     }
 
     private AtomicLong overdueGaugeFor(String processName) {

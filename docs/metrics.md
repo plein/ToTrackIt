@@ -10,6 +10,9 @@ ToTrackIt exposes Prometheus/OpenMetrics at `/prometheus`. Beyond HTTP and DB me
 | `totrackit_processes_completed_on_time_total` | counter | `process_name` | Completions within the deadline |
 | `totrackit_processes_completed_late_total` | counter | `process_name` | Completions after the deadline |
 | `totrackit_active_processes_current` | gauge | — | All currently active processes |
+| `totrackit_notifications_backlog` | gauge | `event` | Deadline events (`deadline_missed` / `deadline_warning`) not yet processed, e.g. because webhook deliveries keep failing (updated every scan cycle) |
+
+`process_name` labels assume low-cardinality names (dozens to hundreds, not one name per run). The per-name overdue gauge tracks the top 100 names by overdue count and drops recovered series beyond that cap, so a badly chosen naming scheme cannot blow up the metrics endpoint.
 
 ## Prometheus alert example
 

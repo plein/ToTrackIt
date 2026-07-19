@@ -56,7 +56,7 @@ The frontend is a Vite + React + TypeScript app. It uses the custom `tti-*` CSS 
 
 Key source layout:
 - `src/api/processes.ts` — fetch wrappers with response normalization
-- `src/hooks/useProcesses.ts` — TanStack Query hooks (auto-paginates up to backend's 100-per-page cap)
+- `src/hooks/useProcesses.ts` — TanStack Query hooks: one bounded request per view (useProcessList takes server-side filters + limit/offset; useSummary and useNameRollups hit the aggregate endpoints; no client-side crawling of all pages)
 - `src/components/` — shared atoms (Icon, StatusPill, TagChip, DeadlineBar, Button, Sidebar, DetailPanel, CreateProcessModal, Toast, Wordmark)
 - `src/pages/` — Dashboard, NameRollups, Tags, Metrics
 - `src/lib/format.ts` — `fmtRelative`, `fmtDuration`, `fmtAbsolute` (all timestamps are Unix seconds)
@@ -77,9 +77,9 @@ Clean layered architecture: **Controller → Service → Repository → Entity/D
 
 ```
 src/main/java/com/totrackit/
-├── controller/       # HTTP layer: ProcessController, AnalyticsController (/analytics/tags), HealthController, GlobalExceptionHandler
-├── service/          # Business logic: ProcessService, AnalyticsService (tag-impact aggregation), MetricsService, HealthService
-├── repository/       # JDBC data access: ProcessRepository (custom queries, filtering, pagination)
+├── controller/       # HTTP layer: ProcessController, AnalyticsController (/analytics/tags, /analytics/summary, /analytics/names), HealthController, GlobalExceptionHandler
+├── service/          # Business logic: ProcessService, AnalyticsService (SQL aggregation via JdbcOperations), MetricsService, HealthService, AdvisoryLockService (pg_try_advisory_lock for cross-replica scan coordination)
+├── repository/       # JDBC data access: ProcessRepository (point lookups + batched scanner queries), ProcessQueryRepository (dynamic SQL list/count: filters, JSONB tag containment, sort whitelist, pagination)
 ├── entity/           # DB entity: ProcessEntity, enums ProcessStatus / DeadlineStatus
 ├── dto/              # Request/response types: NewProcessRequest, ProcessResponse, PagedResult, ProcessFilter
 ├── mapper/           # ProcessMapper (entity ↔ DTO)
@@ -88,7 +88,7 @@ src/main/java/com/totrackit/
 └── task/             # Scheduled tasks: MetricsUpdateTask (gauges incl. per-name overdue), DeadlineNotificationTask (always runs: fires deadline_warning at totrackit.warning-threshold (default 0.75) and deadline_missed events; records both metrics; sends webhooks when TOTRACKIT_WEBHOOK_URL is set; payload deep-links to the dashboard when TOTRACKIT_PUBLIC_URL is set)
 src/main/resources/
 ├── application*.yml  # Micronaut config per environment
-└── db/migration/     # Flyway migrations (V1 baseline → V2 schema → V3 indexes → V4 namespace_id + deadline_notified_at → V5 deadline_warned_at)
+└── db/migration/     # Flyway migrations (V1 baseline → V2 schema → V3 indexes → V4 namespace_id + deadline_notified_at → V5 deadline_warned_at → V6 scalability indexes: (status|name, started_at DESC, id DESC) composites, deadline_unwarned partial)
 ```
 
 New columns also need mirroring in `src/test/resources/schema.sql` (H2 test schema).
@@ -97,6 +97,8 @@ New columns also need mirroring in `src/test/resources/schema.sql` (H2 test sche
 
 - **DeadlineStatus is computed at read time** — not persisted. `ProcessService` calculates `ON_TRACK`, `MISSED`, `COMPLETED_ON_TIME`, `COMPLETED_LATE` from stored timestamps.
 - **Uniqueness** is enforced via a PostgreSQL partial unique index on `process_id` where `status = 'ACTIVE'` (V2 migration), preventing race conditions at the DB level instead of application level.
+- **The read path is SQL-native and PG-only**: list filtering/sorting/pagination (ProcessQueryRepository) and analytics (jsonb_array_elements, COUNT FILTER, percentile_cont) cannot run on H2 — anything exercising them needs Testcontainers. ORDER BY emits `NULLS LAST` only for nullable sort columns; adding it to NOT NULL columns breaks index-ordered scans (see V6 composites).
+- **Deadline scanners are batched** (`totrackit.notification-batch-size`, default 500), circuit-break after 5 consecutive webhook failures, publish a `totrackit_notifications_backlog` gauge, and serialize across replicas via an advisory lock.
 - **Tags and context** are stored as JSONB columns for flexibility without schema migrations.
 - **Metrics** are recorded in `MetricsService` and wired via `MetricsInterceptor`; Prometheus scrapes `/prometheus`. Deadline-aware series (`totrackit_processes_overdue_current` gauge per process_name, `deadline_missed`/`completed_on_time`/`completed_late` counters) exist so external monitors (Prometheus alerts, Datadog SLOs) can page on deadline breaches — see the README "Metrics, Prometheus & Datadog" section.
 - **OpenAPI docs** are auto-generated from annotations and served at `/openapi.yml`; Swagger UI runs on a separate nginx container at port 8081.

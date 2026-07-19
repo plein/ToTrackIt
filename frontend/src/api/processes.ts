@@ -6,6 +6,8 @@ import type {
   ProcessFilter,
   ApiError,
   TagImpactResponse,
+  SummaryResponse,
+  NameRollupEntry,
 } from '@/types'
 
 function extractMessage(body: unknown): string {
@@ -54,14 +56,30 @@ function normalize(p: ProcessResponse): ProcessResponse {
   }
 }
 
+// The backend binds these filters under camelCase query parameter names
+const QUERY_PARAM_NAMES: Record<string, string> = {
+  deadline_status: 'deadlineStatus',
+  deadline_before: 'deadlineBefore',
+  deadline_after: 'deadlineAfter',
+  running_duration_min: 'runningDurationMin',
+}
+
 export async function listProcesses(filter: ProcessFilter = {}): Promise<PagedResult<ProcessResponse>> {
   const params = new URLSearchParams()
   Object.entries(filter).forEach(([k, v]) => {
-    if (v !== undefined && v !== '') params.set(k, String(v))
+    if (v !== undefined && v !== '') params.set(QUERY_PARAM_NAMES[k] ?? k, String(v))
   })
   const qs = params.toString()
   const result = await request<PagedResult<ProcessResponse>>(`/processes/${qs ? `?${qs}` : ''}`)
   return { ...result, data: result.data.map(normalize) }
+}
+
+export async function getSummary(): Promise<SummaryResponse> {
+  return request<SummaryResponse>('/analytics/summary')
+}
+
+export async function getNameRollups(limit = 20, offset = 0): Promise<PagedResult<NameRollupEntry>> {
+  return request<PagedResult<NameRollupEntry>>(`/analytics/names?limit=${limit}&offset=${offset}`)
 }
 
 export async function getProcess(name: string, id: string): Promise<ProcessResponse> {

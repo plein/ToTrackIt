@@ -3,6 +3,7 @@ package com.totrackit.service;
 import com.totrackit.entity.ProcessEntity;
 import com.totrackit.model.DeadlineStatus;
 import com.totrackit.model.ProcessStatus;
+import com.totrackit.repository.ProcessQueryRepository;
 import com.totrackit.repository.ProcessRepository;
 import com.totrackit.service.MetricsService;
 import com.totrackit.util.ProcessMapper;
@@ -23,6 +24,9 @@ class ProcessServiceFunctionalityTest {
     
     @Mock
     private ProcessRepository processRepository;
+
+    @Mock
+    private ProcessQueryRepository processQueryRepository;
     
     @Mock
     private ProcessMapper processMapper;
@@ -35,7 +39,7 @@ class ProcessServiceFunctionalityTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        processService = new ProcessService(processRepository, processMapper, metricsService);
+        processService = new ProcessService(processRepository, processQueryRepository, processMapper, metricsService);
     }
     
     @Test

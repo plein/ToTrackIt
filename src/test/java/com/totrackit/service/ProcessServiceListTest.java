@@ -5,8 +5,8 @@ import com.totrackit.dto.Pageable;
 import com.totrackit.dto.PagedResult;
 import com.totrackit.dto.ProcessResponse;
 import com.totrackit.entity.ProcessEntity;
+import com.totrackit.repository.ProcessQueryRepository;
 import com.totrackit.repository.ProcessRepository;
-import com.totrackit.service.MetricsService;
 import com.totrackit.util.ProcessMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,39 +20,44 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit test for ProcessService listProcesses method.
+ * Unit test for ProcessService listProcesses method. Filtering, sorting and
+ * pagination happen in ProcessQueryRepository (SQL); the service just wires
+ * page + count into a PagedResult.
  */
 public class ProcessServiceListTest {
-    
+
     @Mock
     private ProcessRepository processRepository;
-    
+
+    @Mock
+    private ProcessQueryRepository processQueryRepository;
+
     @Mock
     private ProcessMapper processMapper;
-    
+
     @Mock
     private MetricsService metricsService;
-    
+
     private ProcessService processService;
-    
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        processService = new ProcessService(processRepository, processMapper, metricsService);
+        processService = new ProcessService(processRepository, processQueryRepository, processMapper, metricsService);
     }
-    
+
     @Test
     public void testListProcesses_EmptyList() {
         // Given
         ProcessFilter filter = new ProcessFilter();
         Pageable pageable = new Pageable();
-        
-        when(processRepository.findWithComprehensiveFilters(null, null, null, Integer.MAX_VALUE, 0))
-                .thenReturn(new ArrayList<>());
-        
+
+        when(processQueryRepository.findPage(filter, pageable)).thenReturn(new ArrayList<>());
+        when(processQueryRepository.count(filter)).thenReturn(0L);
+
         // When
         PagedResult<ProcessResponse> result = processService.listProcesses(filter, pageable);
-        
+
         // Then
         assertNotNull(result);
         assertEquals(0, result.getData().size());
@@ -60,31 +65,32 @@ public class ProcessServiceListTest {
         assertEquals(20, result.getLimit());
         assertEquals(0, result.getOffset());
         assertFalse(result.isHasMore());
-        
-        verify(processRepository).findWithComprehensiveFilters(null, null, null, Integer.MAX_VALUE, 0);
+
+        verify(processQueryRepository).findPage(filter, pageable);
+        verify(processQueryRepository).count(filter);
     }
-    
+
     @Test
     public void testListProcesses_WithProcesses() {
         // Given
         ProcessFilter filter = new ProcessFilter();
         Pageable pageable = new Pageable();
-        
+
         List<ProcessEntity> entities = new ArrayList<>();
         ProcessEntity entity = new ProcessEntity("test-id", "test-process");
         entities.add(entity);
-        
+
         ProcessResponse response = new ProcessResponse();
         response.setId("test-id");
         response.setName("test-process");
-        
-        when(processRepository.findWithComprehensiveFilters(null, null, null, Integer.MAX_VALUE, 0))
-                .thenReturn(entities);
+
+        when(processQueryRepository.findPage(filter, pageable)).thenReturn(entities);
+        when(processQueryRepository.count(filter)).thenReturn(1L);
         when(processMapper.toResponse(entity)).thenReturn(response);
-        
+
         // When
         PagedResult<ProcessResponse> result = processService.listProcesses(filter, pageable);
-        
+
         // Then
         assertNotNull(result);
         assertEquals(1, result.getData().size());
@@ -92,12 +98,32 @@ public class ProcessServiceListTest {
         assertEquals(20, result.getLimit());
         assertEquals(0, result.getOffset());
         assertFalse(result.isHasMore());
-        
+
         ProcessResponse actualResponse = result.getData().get(0);
         assertEquals("test-id", actualResponse.getId());
         assertEquals("test-process", actualResponse.getName());
-        
-        verify(processRepository).findWithComprehensiveFilters(null, null, null, Integer.MAX_VALUE, 0);
+
+        verify(processQueryRepository).findPage(filter, pageable);
         verify(processMapper).toResponse(entity);
+    }
+
+    @Test
+    public void testListProcesses_TotalBeyondPage() {
+        // Given a page smaller than the total, has_more must be set
+        ProcessFilter filter = new ProcessFilter();
+        Pageable pageable = new Pageable(1, 0);
+
+        ProcessEntity entity = new ProcessEntity("test-id", "test-process");
+        when(processQueryRepository.findPage(filter, pageable)).thenReturn(List.of(entity));
+        when(processQueryRepository.count(filter)).thenReturn(5L);
+        when(processMapper.toResponse(entity)).thenReturn(new ProcessResponse());
+
+        // When
+        PagedResult<ProcessResponse> result = processService.listProcesses(filter, pageable);
+
+        // Then
+        assertEquals(5, result.getTotal());
+        assertEquals(1, result.getData().size());
+        assertTrue(result.isHasMore());
     }
 }

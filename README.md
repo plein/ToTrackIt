@@ -106,6 +106,7 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tes
 * Tag-impact analytics with completion latency (avg/p50/p90/p99) overall and per tag
 * Pre-deadline warning events at a configurable threshold, so automation can prevent the breach instead of reacting to it
 * Optional static API key
+* Scalability to millions of processes: list filtering, pagination, tag search, and analytics run in SQL (JSONB containment, covering indexes), the deadline scanners are batched with cross-replica locking, and the UI uses server-side pagination and rollups
 
 ### Next (open-source core)
 

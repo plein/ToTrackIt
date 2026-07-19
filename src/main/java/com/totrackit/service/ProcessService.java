@@ -11,6 +11,7 @@ import com.totrackit.exception.ProcessNotFoundException;
 import com.totrackit.model.DeadlineStatus;
 import com.totrackit.model.ProcessStatus;
 import com.totrackit.model.ProcessTag;
+import com.totrackit.repository.ProcessQueryRepository;
 import com.totrackit.repository.ProcessRepository;
 import com.totrackit.util.ProcessMapper;
 import io.micronaut.transaction.annotation.Transactional;
@@ -34,12 +35,15 @@ public class ProcessService {
     private static final Logger LOG = LoggerFactory.getLogger(ProcessService.class);
     
     private final ProcessRepository processRepository;
+    private final ProcessQueryRepository processQueryRepository;
     private final ProcessMapper processMapper;
     private final MetricsService metricsService;
-    
+
     @Inject
-    public ProcessService(ProcessRepository processRepository, ProcessMapper processMapper, MetricsService metricsService) {
+    public ProcessService(ProcessRepository processRepository, ProcessQueryRepository processQueryRepository,
+                          ProcessMapper processMapper, MetricsService metricsService) {
         this.processRepository = processRepository;
+        this.processQueryRepository = processQueryRepository;
         this.processMapper = processMapper;
         this.metricsService = metricsService;
     }
@@ -216,48 +220,22 @@ public class ProcessService {
         }
         
         try {
-            // Get all matching records from database (without pagination for now)
-            // We'll apply pagination after additional filtering and sorting
-            List<ProcessEntity> entities = processRepository.findWithComprehensiveFilters(
-                    filter.getName(),
-                    filter.getId(),
-                    filter.getStatus(),
-                    Integer.MAX_VALUE, // Get all records
-                    0 // No offset
-            );
-            
+            // Filtering, sorting and pagination all happen in SQL; the total is
+            // a COUNT(*) over the same predicates.
+            List<ProcessEntity> entities = processQueryRepository.findPage(filter, pageable);
+            long total = processQueryRepository.count(filter);
+
             // Record successful database read operation
             metricsService.recordDatabaseOperation("read", "processes", true);
-            
-            LOG.debug("Retrieved {} entities from repository", entities.size());
-            
-            // Apply additional filtering that can't be done at database level
-            entities = applyAdditionalFiltering(entities, filter);
-            
-            LOG.debug("After additional filtering: {} entities", entities.size());
-            
-            // Calculate total count before pagination
-            long total = entities.size();
-            
-            // Apply sorting
-            entities = applySorting(entities, filter);
-            
-            // Apply pagination after filtering and sorting
-            entities = applyPagination(entities, pageable);
-            
-            // Convert to responses
+
             List<ProcessResponse> responses = entities.stream()
                     .map(processMapper::toResponse)
                     .collect(Collectors.toList());
-            
+
             LOG.debug("Final result: {} responses out of {} total", responses.size(), total);
-            
-            PagedResult<ProcessResponse> result = new PagedResult<>(responses, total, pageable.getLimit(), pageable.getOffset());
-            
-            LOG.debug("Returning result: {}", result);
-            
-            return result;
-            
+
+            return new PagedResult<>(responses, total, pageable.getLimit(), pageable.getOffset());
+
         } catch (Exception e) {
             // Record failed database operation
             metricsService.recordDatabaseOperation("read", "processes", false);
@@ -265,172 +243,7 @@ public class ProcessService {
             throw e;
         }
     }
-    
-    /**
-     * Applies tag-based filtering using repository methods.
-     */
-    private List<ProcessEntity> applyTagFiltering(ProcessFilter filter, Pageable pageable) {
-        // For simplicity, we'll use the first tag for filtering
-        Map.Entry<String, String> firstTag = filter.getTags().entrySet().iterator().next();
-        List<ProcessEntity> entities = processRepository.findByTag(firstTag.getKey(), firstTag.getValue());
-        
-        // Apply status filtering if specified
-        if (filter.getStatus() != null) {
-            entities = entities.stream()
-                    .filter(e -> e.getStatus() == filter.getStatus())
-                    .collect(Collectors.toList());
-        }
-        
-        return applyPagination(entities, pageable);
-    }
-    
-    /**
-     * Applies sorting to a list of entities based on filter criteria.
-     */
-    private List<ProcessEntity> applySorting(List<ProcessEntity> entities, ProcessFilter filter) {
-        if (entities.isEmpty()) {
-            return entities;
-        }
-        
-        String sortBy = filter.getSortBy() != null ? filter.getSortBy() : "started_at";
-        String sortDirection = filter.getSortDirection() != null ? filter.getSortDirection() : "desc";
-        boolean ascending = "asc".equalsIgnoreCase(sortDirection);
-        
-        return entities.stream()
-                .sorted((e1, e2) -> {
-                    int comparison = 0;
-                    
-                    switch (sortBy.toLowerCase()) {
-                        case "started_at":
-                            comparison = e1.getStartedAt().compareTo(e2.getStartedAt());
-                            break;
-                        case "completed_at":
-                            if (e1.getCompletedAt() == null && e2.getCompletedAt() == null) {
-                                comparison = 0;
-                            } else if (e1.getCompletedAt() == null) {
-                                comparison = 1; // null values last
-                            } else if (e2.getCompletedAt() == null) {
-                                comparison = -1; // null values last
-                            } else {
-                                comparison = e1.getCompletedAt().compareTo(e2.getCompletedAt());
-                            }
-                            break;
-                        case "deadline":
-                            if (e1.getDeadline() == null && e2.getDeadline() == null) {
-                                comparison = 0;
-                            } else if (e1.getDeadline() == null) {
-                                comparison = 1; // null values last
-                            } else if (e2.getDeadline() == null) {
-                                comparison = -1; // null values last
-                            } else {
-                                comparison = e1.getDeadline().compareTo(e2.getDeadline());
-                            }
-                            break;
-                        case "name":
-                            comparison = e1.getName().compareTo(e2.getName());
-                            break;
-                        case "status":
-                            comparison = e1.getStatus().compareTo(e2.getStatus());
-                            break;
-                        case "duration":
-                            Long d1 = calculateDuration(e1);
-                            Long d2 = calculateDuration(e2);
-                            if (d1 == null && d2 == null) {
-                                comparison = 0;
-                            } else if (d1 == null) {
-                                comparison = 1;
-                            } else if (d2 == null) {
-                                comparison = -1;
-                            } else {
-                                comparison = d1.compareTo(d2);
-                            }
-                            break;
-                        default:
-                            // Default to started_at for unknown sort fields
-                            comparison = e1.getStartedAt().compareTo(e2.getStartedAt());
-                    }
-                    
-                    return ascending ? comparison : -comparison;
-                })
-                .collect(Collectors.toList());
-    }
-    
-    /**
-     * Applies pagination to a list of entities.
-     */
-    private List<ProcessEntity> applyPagination(List<ProcessEntity> entities, Pageable pageable) {
-        int start = Math.min(pageable.getOffset(), entities.size());
-        int end = Math.min(start + pageable.getLimit(), entities.size());
-        return entities.subList(start, end);
-    }
-    
-    /**
-     * Applies additional filtering criteria that cannot be handled at the database level.
-     */
-    private List<ProcessEntity> applyAdditionalFiltering(List<ProcessEntity> entities, ProcessFilter filter) {
-        return entities.stream()
-                .filter(entity -> matchesDeadlineStatus(entity, filter.getDeadlineStatus()))
-                .filter(entity -> matchesDeadlineRange(entity, filter.getDeadlineBefore(), filter.getDeadlineAfter()))
-                .filter(entity -> matchesRunningDuration(entity, filter.getRunningDurationMin()))
-                .collect(Collectors.toList());
-    }
-    
-    /**
-     * Checks if an entity matches the specified deadline status.
-     */
-    private boolean matchesDeadlineStatus(ProcessEntity entity, DeadlineStatus targetStatus) {
-        if (targetStatus == null) {
-            return true;
-        }
-        
-        DeadlineStatus entityStatus = calculateDeadlineStatus(entity);
-        return entityStatus == targetStatus;
-    }
-    
-    /**
-     * Checks if an entity matches the deadline range criteria.
-     */
-    private boolean matchesDeadlineRange(ProcessEntity entity, Long deadlineBefore, Long deadlineAfter) {
-        if (entity.getDeadline() == null) {
-            return deadlineBefore == null && deadlineAfter == null;
-        }
-        
-        long entityDeadline = entity.getDeadline().getEpochSecond();
-        
-        if (deadlineBefore != null && entityDeadline >= deadlineBefore) {
-            return false;
-        }
-        
-        if (deadlineAfter != null && entityDeadline <= deadlineAfter) {
-            return false;
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Checks if an entity matches the minimum running duration criteria.
-     */
-    private boolean matchesRunningDuration(ProcessEntity entity, Integer runningDurationMin) {
-        if (runningDurationMin == null || entity.getStatus() != ProcessStatus.ACTIVE) {
-            return true;
-        }
-        
-        Long duration = calculateDuration(entity);
-        return duration != null && duration >= runningDurationMin;
-    }
-    
-    /**
-     * Calculates the total count of processes matching the filter criteria.
-     * This is a simplified implementation for the current phase.
-     */
-    private long calculateTotalCount(ProcessFilter filter) {
-        if (filter.getStatus() != null) {
-            return processRepository.countByStatus(filter.getStatus());
-        }
-        return processRepository.countAll();
-    }
-    
+
     /**
      * Calculates deadline status for a process entity in real-time.
      * This method provides the business logic for deadline status calculation.

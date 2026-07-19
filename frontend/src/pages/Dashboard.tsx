@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import type { ProcessResponse, ProcessTag } from '@/types'
+import type { ProcessFilter, ProcessResponse, ProcessStatus, DeadlineStatus, ProcessTag } from '@/types'
 import { fmtRelative, fmtDuration } from '@/lib/format'
 import { Icon } from '@/components/Icon'
 import { Button } from '@/components/Button'
@@ -8,9 +8,12 @@ import { STATUS_TONE } from '@/lib/statusTone'
 import { TagChip } from '@/components/TagChip'
 import { DeadlineBar } from '@/components/DeadlineBar'
 import { ImpactedTags } from '@/components/ImpactedTags'
-import { useTagImpact } from '@/hooks/useProcesses'
+import { useProcessList, useSummary, useNameRollups, useTagImpact, PAGE_SIZE } from '@/hooks/useProcesses'
 
 const now = () => Math.floor(Date.now() / 1000)
+
+// Sort keys the backend whitelists for ORDER BY
+type SortField = 'started_at' | 'completed_at' | 'deadline' | 'name' | 'status' | 'duration'
 
 // ---- Stat card ----
 interface StatCardProps {
@@ -106,7 +109,6 @@ function FilterChip({ label, value, options, onChange }: FilterChipProps) {
 
 // ---- Main Dashboard ----
 interface DashboardProps {
-  processes: ProcessResponse[]
   onOpenProcess: (p: ProcessResponse) => void
   onOpenCreate: () => void
   onComplete: (p: ProcessResponse, status: 'COMPLETED' | 'FAILED') => void
@@ -114,13 +116,12 @@ interface DashboardProps {
   density?: string
   initialNameFilter?: string | null
   initialTagFilter?: { key: string; value: string } | null
+  initialStatusFilter?: ProcessStatus | null
+  initialDeadlineFilter?: DeadlineStatus | null
   navKey?: string
-  onRefresh?: () => void
-  isFetching?: boolean
 }
 
 export function Dashboard({
-  processes,
   onOpenProcess,
   onOpenCreate,
   onComplete,
@@ -128,19 +129,29 @@ export function Dashboard({
   density = 'comfortable',
   initialNameFilter,
   initialTagFilter,
+  initialStatusFilter,
+  initialDeadlineFilter,
   navKey,
-  onRefresh,
-  isFetching = false,
 }: DashboardProps) {
   const n = now()
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [deadlineFilter, setDeadlineFilter] = useState('all')
+  const [appliedSearch, setAppliedSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter ?? 'all')
+  const [deadlineFilter, setDeadlineFilter] = useState(initialDeadlineFilter ?? 'all')
   const [nameFilter, setNameFilter] = useState(initialNameFilter || 'all')
   const [activeTags, setActiveTags] = useState<ProcessTag[]>(initialTagFilter ? [initialTagFilter] : [])
-  const [sortField, setSortField] = useState<keyof ProcessResponse>('started_at')
+  const [sortField, setSortField] = useState<SortField>('started_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [page, setPage] = useState(0)
   const { data: tagImpact } = useTagImpact()
+  const { data: summary } = useSummary()
+  const { data: rollups } = useNameRollups(100, 0)
+
+  // Debounce the exact-name search so typing doesn't fire a query per keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setAppliedSearch(search.trim()), 300)
+    return () => clearTimeout(t)
+  }, [search])
 
   // Reset filters when navigation changes; render-phase state adjustment
   // instead of an effect (see React docs on resetting state when a prop changes)
@@ -149,58 +160,53 @@ export function Dashboard({
   if (resetKey !== prevResetKey) {
     setPrevResetKey(resetKey)
     setNameFilter(initialNameFilter || 'all')
-    setStatusFilter('all')
-    setDeadlineFilter('all')
+    setStatusFilter(initialStatusFilter ?? 'all')
+    setDeadlineFilter(initialDeadlineFilter ?? 'all')
     setActiveTags(initialTagFilter ? [initialTagFilter] : [])
     setSearch('')
+    setAppliedSearch('')
+    setPage(0)
   }
 
-  const stats = useMemo(() => {
-    const active = processes.filter((p) => p.status === 'ACTIVE').length
-    const missed = processes.filter((p) => p.deadline_status === 'MISSED').length
-    const failed = processes.filter((p) => p.status === 'FAILED').length
-    const completedToday = processes.filter(
-      (p) => p.status === 'COMPLETED' && p.completed_at != null && n - p.completed_at < 86400
-    ).length
-    const done = processes.filter((p) => p.status === 'COMPLETED')
-    const onTimeRate = done.length
-      ? Math.round((done.filter((p) => p.deadline_status === 'COMPLETED_ON_TIME').length / done.length) * 100)
-      : 100
-    return { total: processes.length, active, missed, failed, completedToday, onTimeRate }
-  }, [processes, n])
+  // Server-side filter; the backend does the filtering, sorting and paging
+  const filter: ProcessFilter = useMemo(() => ({
+    name: appliedSearch || (nameFilter !== 'all' ? nameFilter : undefined),
+    status: statusFilter !== 'all' ? (statusFilter as ProcessStatus) : undefined,
+    deadline_status: deadlineFilter !== 'all' ? (deadlineFilter as DeadlineStatus) : undefined,
+    tags: activeTags.length ? activeTags.map((t) => `${t.key}:${t.value}`).join(',') : undefined,
+    sort_by: `${sortField}:${sortDir}`,
+    limit: PAGE_SIZE,
+    offset: page * PAGE_SIZE,
+  }), [appliedSearch, nameFilter, statusFilter, deadlineFilter, activeTags, sortField, sortDir, page])
 
-  const names = useMemo(() => {
-    const m = new Map<string, number>()
-    processes.forEach((p) => m.set(p.name, (m.get(p.name) || 0) + 1))
-    return [...m.entries()].sort((a, b) => b[1] - a[1])
-  }, [processes])
+  // Snap back to the first page whenever any filter (but not the page) changes
+  const filterKey = `${filter.name ?? ''}|${filter.status ?? ''}|${filter.deadline_status ?? ''}|${filter.tags ?? ''}|${filter.sort_by}`
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey)
+    if (page !== 0) setPage(0)
+  }
 
-  const filtered = useMemo(() => {
-    let list = processes.slice()
-    const q = search.trim().toLowerCase()
-    if (q) {
-      list = list.filter(
-        (p) =>
-          p.id.toLowerCase().includes(q) ||
-          p.name.toLowerCase().includes(q) ||
-          p.tags.some((t) => `${t.key}:${t.value}`.toLowerCase().includes(q))
-      )
-    }
-    if (statusFilter !== 'all') list = list.filter((p) => p.status === statusFilter)
-    if (deadlineFilter !== 'all') list = list.filter((p) => p.deadline_status === deadlineFilter)
-    if (nameFilter !== 'all') list = list.filter((p) => p.name === nameFilter)
-    if (activeTags.length) {
-      list = list.filter((p) =>
-        activeTags.every((t) => p.tags.some((pt) => pt.key === t.key && pt.value === t.value))
-      )
-    }
-    list.sort((a, b) => {
-      const av = (a[sortField] as number) ?? 0
-      const bv = (b[sortField] as number) ?? 0
-      return sortDir === 'desc' ? bv - av : av - bv
-    })
-    return list
-  }, [processes, search, statusFilter, deadlineFilter, nameFilter, activeTags, sortField, sortDir])
+  const { data: pageResult, isFetching, refetch } = useProcessList(filter)
+  const rows = pageResult?.data ?? []
+  const total = pageResult?.total ?? 0
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  const stats = useMemo(() => ({
+    total: summary?.total ?? 0,
+    active: summary?.active ?? 0,
+    missed: summary?.overdue ?? 0,
+    failed: summary?.failed ?? 0,
+    completedToday: summary?.completed_24h ?? 0,
+    onTimeRate: summary && summary.completed > 0
+      ? Math.round((summary.completed_on_time / summary.completed) * 100)
+      : 100,
+  }), [summary])
+
+  const nameOptions = useMemo(
+    () => (rollups?.data ?? []).map((r) => ({ value: r.name, label: r.name, count: r.total })),
+    [rollups],
+  )
 
   const toggleTag = (t: ProcessTag) => {
     setActiveTags((cur) => {
@@ -209,22 +215,22 @@ export function Dashboard({
     })
   }
 
-  const headerSort = (field: keyof ProcessResponse) => {
+  const headerSort = (field: SortField) => {
     if (sortField === field) setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))
     else { setSortField(field); setSortDir('desc') }
   }
 
-  const sortInd = (field: keyof ProcessResponse) =>
+  const sortInd = (field: SortField) =>
     sortField === field ? (sortDir === 'desc' ? '↓' : '↑') : ''
 
   const clearFilters = () => {
-    setSearch(''); setStatusFilter('all'); setDeadlineFilter('all')
-    setNameFilter('all'); setActiveTags([])
+    setSearch(''); setAppliedSearch(''); setStatusFilter('all'); setDeadlineFilter('all')
+    setNameFilter('all'); setActiveTags([]); setPage(0)
   }
-  const hasFilters = search || statusFilter !== 'all' || deadlineFilter !== 'all' || nameFilter !== 'all' || activeTags.length > 0
+  const hasFilters = appliedSearch || statusFilter !== 'all' || deadlineFilter !== 'all' || nameFilter !== 'all' || activeTags.length > 0
 
   // No processes at all in this workspace (not a filter issue)
-  if (processes.length === 0) {
+  if (summary && summary.total === 0) {
     return (
       <div className="tti-dashboard">
         <div className="tti-page-header">
@@ -264,7 +270,7 @@ export function Dashboard({
           </div>
         </div>
         <div className="tti-page-header__actions">
-          <Button variant="ghost" icon="refresh" onClick={onRefresh} disabled={isFetching} style={isFetching ? { opacity: 0.6 } : undefined}>
+          <Button variant="ghost" icon="refresh" onClick={() => refetch()} disabled={isFetching} style={isFetching ? { opacity: 0.6 } : undefined}>
             {isFetching ? 'Refreshing…' : 'Refresh'}
           </Button>
           <Button variant="primary" icon="plus" onClick={onOpenCreate}>New process</Button>
@@ -288,9 +294,9 @@ export function Dashboard({
         />
         <StatCard
           label="Failed (24h)"
-          value={stats.failed}
-          sub={`${stats.failed} processes`}
-          tone={stats.failed ? 'amber' : 'neutral'}
+          value={summary?.failed_24h ?? 0}
+          sub={`${stats.failed} all time`}
+          tone={summary?.failed_24h ? 'amber' : 'neutral'}
           trend={[0.1, 0.12, 0.08, 0.1, 0.14, 0.12, 0.18, 0.16, 0.22, 0.18, 0.24, 0.28]}
         />
         <StatCard
@@ -316,12 +322,12 @@ export function Dashboard({
           <Icon name="search" size={16} />
           <input
             type="text"
-            placeholder="Search by id, name, or tag…"
+            placeholder="Filter by process name…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
           {search && (
-            <button type="button" className="tti-search__clear" onClick={() => setSearch('')}>
+            <button type="button" className="tti-search__clear" onClick={() => { setSearch(''); setAppliedSearch('') }}>
               <Icon name="x" size={14} />
             </button>
           )}
@@ -333,9 +339,9 @@ export function Dashboard({
           onChange={setStatusFilter}
           options={[
             { value: 'all', label: 'All' },
-            { value: 'ACTIVE', label: 'Active', tone: 'blue', count: processes.filter((p) => p.status === 'ACTIVE').length },
-            { value: 'COMPLETED', label: 'Completed', tone: 'green', count: processes.filter((p) => p.status === 'COMPLETED').length },
-            { value: 'FAILED', label: 'Failed', tone: 'red', count: processes.filter((p) => p.status === 'FAILED').length },
+            { value: 'ACTIVE', label: 'Active', tone: 'blue', count: summary?.active },
+            { value: 'COMPLETED', label: 'Completed', tone: 'green', count: summary?.completed },
+            { value: 'FAILED', label: 'Failed', tone: 'red', count: summary?.failed },
           ]}
         />
         <FilterChip
@@ -356,7 +362,7 @@ export function Dashboard({
           onChange={setNameFilter}
           options={[
             { value: 'all', label: 'All names' },
-            ...names.map(([nm, c]) => ({ value: nm, label: nm, count: c })),
+            ...nameOptions,
           ]}
         />
         {activeTags.map((t) => (
@@ -375,7 +381,7 @@ export function Dashboard({
         )}
         <div className="tti-filterbar__spacer" />
         <div className="tti-filterbar__count">
-          <b>{filtered.length}</b> of {processes.length}
+          <b>{total}</b> {hasFilters ? 'matching' : 'tracked'}
         </div>
       </div>
 
@@ -385,10 +391,12 @@ export function Dashboard({
             <button type="button" onClick={() => headerSort('status')}>Status {sortInd('status')}</button>
           </div>
           <div className="tti-th tti-col-name">
-            <button type="button" onClick={() => headerSort('name')}>Process</button>
+            <button type="button" onClick={() => headerSort('name')}>Process {sortInd('name')}</button>
           </div>
           <div className="tti-th tti-col-tags">Tags</div>
-          <div className="tti-th tti-col-bar">Deadline</div>
+          <div className="tti-th tti-col-bar">
+            <button type="button" onClick={() => headerSort('deadline')}>Deadline {sortInd('deadline')}</button>
+          </div>
           <div className="tti-th tti-col-started">
             <button type="button" onClick={() => headerSort('started_at')}>Started {sortInd('started_at')}</button>
           </div>
@@ -398,7 +406,7 @@ export function Dashboard({
           <div className="tti-th tti-col-actions" />
         </div>
         <div className="tti-table__body">
-          {filtered.map((p) => (
+          {rows.map((p) => (
             <div
               key={`${p.name}/${p.id}`}
               className={`tti-row tti-row--${STATUS_TONE[p.deadline_status ?? ''] || 'neutral'}`}
@@ -477,15 +485,37 @@ export function Dashboard({
               </div>
             </div>
           ))}
-          {filtered.length === 0 && (
+          {rows.length === 0 && (
             <div className="tti-empty">
               <div className="tti-empty__title">No processes match these filters</div>
-              <div className="tti-empty__sub">Try clearing filters or broadening the search.</div>
+              <div className="tti-empty__sub">Try clearing filters. Name search matches exact names.</div>
               <Button variant="ghost" onClick={clearFilters}>Clear filters</Button>
             </div>
           )}
         </div>
       </div>
+
+      {total > PAGE_SIZE && (
+        <div className="tti-filterbar" style={{ marginTop: '12px', justifyContent: 'flex-end', gap: '10px' }}>
+          <div className="tti-filterbar__count">
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
+          </div>
+          <Button
+            variant="ghost"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+          >
+            ← Prev
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+            disabled={page >= pageCount - 1}
+          >
+            Next →
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

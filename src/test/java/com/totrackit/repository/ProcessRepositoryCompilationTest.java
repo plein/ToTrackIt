@@ -33,18 +33,15 @@ class ProcessRepositoryCompilationTest {
             // Custom query methods
             repositoryClass.getMethod("findByNameAndProcessId", String.class, String.class);
             repositoryClass.getMethod("existsActiveProcess", String.class, String.class);
-            repositoryClass.getMethod("findWithFilters", ProcessStatus.class, int.class, int.class);
-            repositoryClass.getMethod("findByNameAndStatus", String.class, ProcessStatus.class);
-            repositoryClass.getMethod("findByTag", String.class, String.class);
-            repositoryClass.getMethod("findByDeadlineBefore", Instant.class);
-            repositoryClass.getMethod("findByDeadlineAfter", Instant.class);
-            repositoryClass.getMethod("findOverdueProcesses", Instant.class);
-            repositoryClass.getMethod("findByStatus", ProcessStatus.class);
-            repositoryClass.getMethod("findByName", String.class);
+            repositoryClass.getMethod("findOverdueUnnotified", Instant.class, int.class);
+            repositoryClass.getMethod("findApproachingUnwarned", Instant.class, double.class, int.class);
+            repositoryClass.getMethod("countOverdueUnnotified", Instant.class);
+            repositoryClass.getMethod("countApproachingUnwarned", Instant.class, double.class);
+            repositoryClass.getMethod("markDeadlineNotified", Long.class, Instant.class);
+            repositoryClass.getMethod("markDeadlineNotifiedBatch", java.util.List.class, Instant.class);
+            repositoryClass.getMethod("markDeadlineWarned", Long.class, Instant.class);
+            repositoryClass.getMethod("markDeadlineWarnedBatch", java.util.List.class, Instant.class);
             repositoryClass.getMethod("countByStatus", ProcessStatus.class);
-            repositoryClass.getMethod("countAll");
-            repositoryClass.getMethod("findCompletedProcesses");
-            repositoryClass.getMethod("findWithTagFilters", ProcessStatus.class, String.class, int.class, int.class);
             
             // If we get here, all methods are properly defined
             assertTrue(true, "All repository methods are properly defined");

@@ -1,25 +1,40 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { listProcesses, createProcess, completeProcess, deleteProcess, getTagImpact } from '@/api/processes'
-import type { ProcessFilter, ProcessResponse, NewProcessRequest, CompleteProcessRequest } from '@/types'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
+import {
+  listProcesses,
+  createProcess,
+  completeProcess,
+  deleteProcess,
+  getTagImpact,
+  getSummary,
+  getNameRollups,
+} from '@/api/processes'
+import type { ProcessFilter, NewProcessRequest, CompleteProcessRequest } from '@/types'
 
-const PAGE_SIZE = 100
+export const PAGE_SIZE = 50
 
-async function fetchAllProcesses(filter: ProcessFilter): Promise<ProcessResponse[]> {
-  let offset = 0
-  const all: ProcessResponse[] = []
-  while (true) {
-    const page = await listProcesses({ ...filter, limit: PAGE_SIZE, offset })
-    all.push(...page.data)
-    if (!page.has_more) break
-    offset += PAGE_SIZE
-  }
-  return all
-}
-
+// One bounded request per view; filtering/sorting/pagination happen server-side.
 export function useProcessList(filter: ProcessFilter = {}) {
   return useQuery({
     queryKey: ['processes', filter],
-    queryFn: () => fetchAllProcesses(filter),
+    queryFn: () => listProcesses(filter),
+    placeholderData: keepPreviousData,
+    refetchInterval: 10_000,
+  })
+}
+
+export function useSummary() {
+  return useQuery({
+    queryKey: ['summary'],
+    queryFn: getSummary,
+    refetchInterval: 10_000,
+  })
+}
+
+export function useNameRollups(limit = 20, offset = 0) {
+  return useQuery({
+    queryKey: ['name-rollups', limit, offset],
+    queryFn: () => getNameRollups(limit, offset),
+    placeholderData: keepPreviousData,
     refetchInterval: 10_000,
   })
 }
@@ -32,12 +47,18 @@ export function useTagImpact(name?: string, windowHours = 24) {
   })
 }
 
+function invalidateProcessData(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['processes'] })
+  qc.invalidateQueries({ queryKey: ['summary'] })
+  qc.invalidateQueries({ queryKey: ['name-rollups'] })
+}
+
 export function useCreateProcess() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ name, body }: { name: string; body: NewProcessRequest }) =>
       createProcess(name, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['processes'] }),
+    onSuccess: () => invalidateProcessData(qc),
   })
 }
 
@@ -53,7 +74,7 @@ export function useCompleteProcess() {
       id: string
       body: CompleteProcessRequest
     }) => completeProcess(name, id, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['processes'] }),
+    onSuccess: () => invalidateProcessData(qc),
   })
 }
 
@@ -61,6 +82,6 @@ export function useDeleteProcess() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ name, id }: { name: string; id: string }) => deleteProcess(name, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['processes'] }),
+    onSuccess: () => invalidateProcessData(qc),
   })
 }

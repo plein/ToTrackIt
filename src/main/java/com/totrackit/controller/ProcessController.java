@@ -30,7 +30,6 @@ import jakarta.validation.constraints.Max;
 import io.micronaut.core.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.HashMap;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -332,32 +331,29 @@ public class ProcessController {
     
     /**
      * Parses the tags parameter and sets the appropriate tag filters in the filter.
-     * Format: "key1:value1,key2:value2" 
-     * For simplicity, we only support the first tag for filtering.
+     * Format: "key1:value1,key2:value2". All pairs are applied, AND-composed.
      */
     private void parseTagsParameter(ProcessFilter filter, String tags) {
         if (tags == null || tags.trim().isEmpty()) {
             filter.setTags(null);
             return;
         }
-        
+
         try {
-            // Split by comma and take the first tag
-            String[] tagPairs = tags.split(",");
-            String firstTag = tagPairs[0].trim();
-            
-            // Check if key:value format is used
-            if (firstTag.contains(":")) {
-                String[] parts = firstTag.split(":", 2);
-                if (parts.length == 2) {
-                    java.util.Map<String, String> tagMap = new HashMap<>();
+            java.util.Map<String, String> tagMap = new java.util.LinkedHashMap<>();
+            for (String pair : tags.split(",")) {
+                String trimmed = pair.trim();
+                if (trimmed.isEmpty() || !trimmed.contains(":")) {
+                    continue;
+                }
+                String[] parts = trimmed.split(":", 2);
+                if (parts.length == 2 && !parts[0].trim().isEmpty()) {
                     tagMap.put(parts[0].trim(), parts[1].trim());
-                    filter.setTags(tagMap);
-                    
-                    LOG.debug("Parsed tags parameter '{}' to tag filter: {}={}", 
-                            tags, parts[0].trim(), parts[1].trim());
                 }
             }
+            filter.setTags(tagMap.isEmpty() ? null : tagMap);
+
+            LOG.debug("Parsed tags parameter '{}' to tag filters: {}", tags, tagMap);
         } catch (Exception e) {
             LOG.warn("Failed to parse tags parameter '{}': {}", tags, e.getMessage());
             filter.setTags(null);

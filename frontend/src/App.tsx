@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import type { ProcessResponse } from '@/types'
-import { useProcessList, useCreateProcess, useCompleteProcess } from '@/hooks/useProcesses'
+import { useSummary, useNameRollups, useCreateProcess, useCompleteProcess } from '@/hooks/useProcesses'
+import { getProcess } from '@/api/processes'
 import { Sidebar } from '@/components/Sidebar'
 import { DetailPanel } from '@/components/DetailPanel'
 import { CreateProcessModal } from '@/components/CreateProcessModal'
@@ -68,42 +69,38 @@ export default function App() {
     document.documentElement.dataset.theme = theme
   }, [theme])
 
-  const { data: allProcesses = [], isLoading, isFetching, isError, refetch } = useProcessList()
+  // Headline counts come from one aggregate endpoint instead of crawling the
+  // process list; it also doubles as the backend-reachability probe.
+  const { data: summary, isLoading, isError, refetch } = useSummary()
+  const { data: rollups } = useNameRollups(100, 0)
 
   // Deep link from alerts: /?process=<name>/<id> opens the process detail panel
   // (this is the URL embedded in deadline-missed webhook payloads).
-  // Render-phase state adjustment, same pattern as Dashboard's filter reset.
-  const [pendingDeepLink, setPendingDeepLink] = useState<string | null>(
-    () => new URLSearchParams(window.location.search).get('process'),
-  )
-  if (pendingDeepLink && !isLoading) {
-    setPendingDeepLink(null)
-    const slash = pendingDeepLink.indexOf('/')
-    if (slash > 0) {
-      const name = pendingDeepLink.slice(0, slash)
-      const id = pendingDeepLink.slice(slash + 1)
-      const proc = allProcesses.find((p) => p.name === name && p.id === id)
-      if (proc) setOpenProc(proc)
-    }
-  }
-
-  const filteredByNav = useMemo(() => {
-    switch (activeNav) {
-      case 'active':    return allProcesses.filter((p) => p.status === 'ACTIVE')
-      case 'missed':    return allProcesses.filter((p) => p.deadline_status === 'MISSED' || p.deadline_status === 'COMPLETED_LATE')
-      case 'completed': return allProcesses.filter((p) => p.status === 'COMPLETED' || p.status === 'FAILED')
-      default:          return allProcesses
-    }
-  }, [allProcesses, activeNav])
+  useEffect(() => {
+    const deepLink = new URLSearchParams(window.location.search).get('process')
+    if (!deepLink) return
+    const slash = deepLink.indexOf('/')
+    if (slash <= 0) return
+    const name = deepLink.slice(0, slash)
+    const id = deepLink.slice(slash + 1)
+    let cancelled = false
+    getProcess(name, id)
+      .then((proc) => { if (!cancelled) setOpenProc(proc) })
+      .catch(() => { /* stale link; nothing to open */ })
+    return () => { cancelled = true }
+  }, [])
 
   const counts = useMemo(() => ({
-    total:     allProcesses.length,
-    active:    allProcesses.filter((p) => p.status === 'ACTIVE').length,
-    missed:    allProcesses.filter((p) => p.deadline_status === 'MISSED').length,
-    completed: allProcesses.filter((p) => p.status === 'COMPLETED').length,
-  }), [allProcesses])
+    total:     summary?.total ?? 0,
+    active:    summary?.active ?? 0,
+    missed:    summary?.overdue ?? 0,
+    completed: summary?.completed ?? 0,
+  }), [summary])
 
-  const suggestedNames = useMemo(() => [...new Set(allProcesses.map((p) => p.name))], [allProcesses])
+  const suggestedNames = useMemo(
+    () => (rollups?.data ?? []).map((r) => r.name),
+    [rollups],
+  )
 
   const flash = useCallback((msg: string, tone: ToastState['tone'] = 'neutral') => {
     setToast({ msg, tone })
@@ -182,6 +179,16 @@ export default function App() {
     setTagJump({ key, value })
   }
 
+  // Sidebar views map to server-side filter presets on the Dashboard
+  const navPreset = useMemo(() => {
+    switch (activeNav) {
+      case 'active':    return { status: 'ACTIVE' as const }
+      case 'missed':    return { deadline: 'MISSED' as const }
+      case 'completed': return { status: 'COMPLETED' as const }
+      default:          return {}
+    }
+  }, [activeNav])
+
   return (
     <div className="tti-app">
       <Sidebar active={activeNav} onNav={handleNav} counts={counts} />
@@ -193,7 +200,6 @@ export default function App() {
         ) : nameView ? (
           <ProcessName
             name={nameView}
-            processes={allProcesses}
             onBack={closeNameView}
             onOpenProcess={setOpenProc}
             onComplete={handleComplete}
@@ -210,7 +216,6 @@ export default function App() {
               </div>
             </div>
             <NameRollups
-              processes={allProcesses}
               onPickName={openNameView}
               onOpenProcess={setOpenProc}
             />
@@ -218,7 +223,7 @@ export default function App() {
         ) : activeNav === 'metrics' ? (
           <Metrics />
         ) : activeNav === 'tags' ? (
-          <Tags processes={allProcesses} onFilterTag={handleFilterTag} />
+          <Tags onFilterTag={handleFilterTag} />
         ) : activeNav === 'settings' ? (
           <div className="tti-dashboard">
             <div className="tti-page-header">
@@ -238,16 +243,15 @@ export default function App() {
           </div>
         ) : (
           <Dashboard
-            processes={filteredByNav}
             onOpenProcess={setOpenProc}
             onOpenCreate={() => setShowCreate(true)}
             onComplete={handleComplete}
             onOpenName={openNameView}
             initialNameFilter={nameJump}
             initialTagFilter={tagJump}
+            initialStatusFilter={navPreset.status ?? null}
+            initialDeadlineFilter={navPreset.deadline ?? null}
             navKey={activeNav + (nameJump || '') + (tagJump ? `${tagJump.key}:${tagJump.value}` : '')}
-            onRefresh={refetch}
-            isFetching={isFetching}
           />
         )}
       </main>
@@ -255,7 +259,6 @@ export default function App() {
       {openProc && (
         <DetailPanel
           proc={openProc}
-          allProcesses={allProcesses}
           onClose={() => setOpenProc(null)}
           onComplete={handleComplete}
           onOpenOther={setOpenProc}

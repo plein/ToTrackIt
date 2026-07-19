@@ -1,22 +1,22 @@
 import { useMemo } from 'react'
-import type { ProcessResponse } from '@/types'
 import { TagChip } from '@/components/TagChip'
+import { useTagImpact } from '@/hooks/useProcesses'
 
 interface TagsPageProps {
-  processes: ProcessResponse[]
   onFilterTag: (key: string, value: string) => void
 }
 
-export function Tags({ processes, onFilterTag }: TagsPageProps) {
+// Tag catalogue built from the aggregated /analytics/tags endpoint (top 100
+// tag pairs by impact over the last 30 days) instead of crawling every process.
+export function Tags({ onFilterTag }: TagsPageProps) {
+  const { data: tagImpact } = useTagImpact(undefined, 720)
+
   // Group by key → values with counts
   const groups = useMemo(() => {
     const m = new Map<string, Map<string, number>>()
-    for (const p of processes) {
-      for (const t of p.tags) {
-        if (!m.has(t.key)) m.set(t.key, new Map())
-        const vals = m.get(t.key)!
-        vals.set(t.value, (vals.get(t.value) ?? 0) + 1)
-      }
+    for (const t of tagImpact?.tags ?? []) {
+      if (!m.has(t.key)) m.set(t.key, new Map())
+      m.get(t.key)!.set(t.value, t.total)
     }
     return [...m.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
@@ -25,7 +25,7 @@ export function Tags({ processes, onFilterTag }: TagsPageProps) {
         values: [...vals.entries()].sort((a, b) => b[1] - a[1]),
         total: [...vals.values()].reduce((s, n) => s + n, 0),
       }))
-  }, [processes])
+  }, [tagImpact])
 
   const totalUnique = groups.reduce((s, g) => s + g.values.length, 0)
 
@@ -36,7 +36,7 @@ export function Tags({ processes, onFilterTag }: TagsPageProps) {
           <div className="tti-page-header__eyebrow">Workspace · my-workspace</div>
           <h1 className="tti-page-header__title">Tags</h1>
           <div className="tti-page-header__sub">
-            {totalUnique} unique tag values across {groups.length} keys. Click any tag to filter the process list.
+            {totalUnique} tag values across {groups.length} keys, last 30 days. Click any tag to filter the process list.
           </div>
         </div>
       </div>

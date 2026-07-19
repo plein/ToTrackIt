@@ -7,7 +7,7 @@ import { STATUS_TONE } from '@/lib/statusTone'
 import { TagChip } from '@/components/TagChip'
 import { DeadlineBar } from '@/components/DeadlineBar'
 import { ImpactedTags } from '@/components/ImpactedTags'
-import { useTagImpact } from '@/hooks/useProcesses'
+import { useProcessList, useTagImpact, PAGE_SIZE } from '@/hooks/useProcesses'
 
 const now = () => Math.floor(Date.now() / 1000)
 
@@ -37,35 +37,49 @@ function Stat({ label, value, sub, tone = 'neutral' }: StatProps) {
 
 interface ProcessNameProps {
   name: string
-  processes: ProcessResponse[]
   onBack: () => void
   onOpenProcess: (p: ProcessResponse) => void
   onComplete: (p: ProcessResponse, status: 'COMPLETED' | 'FAILED') => void
 }
 
-// Per-name "incident page": every run of one process name, with a period
-// picker driving the runs list, the impacted-tags breakdown, and completion
-// latency stats (avg/p50/p90/p99) overall and per tag.
-export function ProcessName({ name, processes, onBack, onOpenProcess, onComplete }: ProcessNameProps) {
+// Per-name "incident page": runs of one process name (server-side filtered and
+// paginated), with a period picker driving the impacted-tags breakdown and
+// completion latency stats (avg/p50/p90/p99) overall and per tag.
+export function ProcessName({ name, onBack, onOpenProcess, onComplete }: ProcessNameProps) {
   const n = now()
   const [windowHours, setWindowHours] = useState(24)
   const [activeTags, setActiveTags] = useState<ProcessTag[]>([])
+  const [page, setPage] = useState(0)
   const { data: tagImpact } = useTagImpact(name, windowHours)
+
+  // One bounded request: this name's runs, newest first, tag filters applied
+  // server-side.
+  const { data: runsPage } = useProcessList({
+    name,
+    tags: activeTags.length ? activeTags.map((t) => `${t.key}:${t.value}`).join(',') : undefined,
+    sort_by: 'started_at:desc',
+    limit: PAGE_SIZE,
+    offset: page * PAGE_SIZE,
+  })
+  const totalRuns = runsPage?.total ?? 0
+  const pageCount = Math.max(1, Math.ceil(totalRuns / PAGE_SIZE))
+
+  // Snap back to the first page when the tag filter changes
+  const tagKey = activeTags.map((t) => `${t.key}:${t.value}`).join(',')
+  const [prevTagKey, setPrevTagKey] = useState(tagKey)
+  if (tagKey !== prevTagKey) {
+    setPrevTagKey(tagKey)
+    if (page !== 0) setPage(0)
+  }
 
   // Same window semantics as the analytics endpoint: active runs always shown,
   // finished runs only when they finished inside the period.
   const runs = useMemo(() => {
     const since = n - windowHours * 3600
-    let list = processes.filter(
-      (p) => p.name === name && (p.status === 'ACTIVE' || (p.completed_at != null && p.completed_at >= since)),
+    return (runsPage?.data ?? []).filter(
+      (p) => p.status === 'ACTIVE' || (p.completed_at != null && p.completed_at >= since),
     )
-    if (activeTags.length) {
-      list = list.filter((p) =>
-        activeTags.every((t) => p.tags.some((pt) => pt.key === t.key && pt.value === t.value)),
-      )
-    }
-    return list.sort((a, b) => b.started_at - a.started_at)
-  }, [processes, name, windowHours, activeTags, n])
+  }, [runsPage, windowHours, n])
 
   const stats = useMemo(() => {
     const overdue = runs.filter((p) => p.deadline_status === 'MISSED').length
@@ -130,7 +144,12 @@ export function ProcessName({ name, processes, onBack, onOpenProcess, onComplete
       </div>
 
       <div className="tti-stats">
-        <Stat label={`Runs (${windowHours}h)`} value={runs.length} sub={`${stats.completedCount} completed`} tone="blue" />
+        <Stat
+          label={`Runs (${windowHours}h)`}
+          value={tagImpact?.total_processes ?? runs.length}
+          sub={`${totalRuns} all time`}
+          tone="blue"
+        />
         <Stat
           label="Overdue now"
           value={stats.overdue}
@@ -313,6 +332,30 @@ export function ProcessName({ name, processes, onBack, onOpenProcess, onComplete
           )}
         </div>
       </div>
+
+      {totalRuns > PAGE_SIZE && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px', marginTop: '12px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-3)' }}>
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalRuns)} of {totalRuns} runs
+          </span>
+          <button
+            type="button"
+            className="tti-btn tti-btn--ghost tti-btn--sm"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+          >
+            ← Prev
+          </button>
+          <button
+            type="button"
+            className="tti-btn tti-btn--ghost tti-btn--sm"
+            onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+            disabled={page >= pageCount - 1}
+          >
+            Next →
+          </button>
+        </div>
+      )}
     </div>
   )
 }

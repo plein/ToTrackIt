@@ -4,9 +4,9 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import io.micronaut.context.annotation.Value;
+import io.micronaut.data.connection.jdbc.advice.DelegatingDataSource;
+import javax.sql.DataSource;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.HashMap;
@@ -17,18 +17,18 @@ import java.util.Map;
  */
 @Singleton
 public class HealthService {
-    
+
     private static final Logger LOG = LoggerFactory.getLogger(HealthService.class);
-    
-    @Value("${datasources.default.url}")
-    private String dbUrl;
-    
-    @Value("${datasources.default.username}")
-    private String dbUsername;
-    
-    @Value("${datasources.default.password}")
-    private String dbPassword;
-    
+
+    private final DataSource dataSource;
+
+    @Inject
+    public HealthService(DataSource dataSource) {
+        // The injected DataSource is a transaction-aware proxy; unwrap it so
+        // probes can borrow pooled connections outside a transaction.
+        this.dataSource = DelegatingDataSource.unwrapDataSource(dataSource);
+    }
+
     /**
      * Checks database connectivity and performance
      */
@@ -38,8 +38,8 @@ public class HealthService {
         try {
             long startTime = System.currentTimeMillis();
             
-            // Get a direct connection bypassing Micronaut Data
-            try (Connection connection = DriverManager.getConnection(dbUrl, dbUsername, dbPassword)) {
+            // Borrow a pooled connection; probes must not open unpooled connections
+            try (Connection connection = dataSource.getConnection()) {
                 // Test basic connectivity - just check if connection is valid
                 if (connection.isValid(5)) {
                             long responseTime = System.currentTimeMillis() - startTime;
@@ -77,7 +77,7 @@ public class HealthService {
     public Map<String, Object> checkMigrationStatus() {
         Map<String, Object> migrationStatus = new HashMap<>();
         
-        try (Connection connection = DriverManager.getConnection(dbUrl, dbUsername, dbPassword)) {
+        try (Connection connection = dataSource.getConnection()) {
             // First check if flyway_schema_history table exists
             boolean tableExists = false;
             try (PreparedStatement stmt = connection.prepareStatement(

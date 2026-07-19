@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { ProcessResponse } from '@/types'
 import { fmtRelative, fmtDuration, fmtAbsolute } from '@/lib/format'
-import { useDeleteProcess } from '@/hooks/useProcesses'
+import { useDeleteProcess, useProcessList } from '@/hooks/useProcesses'
 import { Icon } from './Icon'
 import { Button } from './Button'
 import { StatusPill } from './StatusPill'
@@ -93,17 +93,17 @@ function ContextTable({ ctx }: { ctx: Record<string, unknown> }) {
 // ---- Related runs ----
 function RelatedRuns({
   proc,
-  all,
   onOpen,
 }: {
   proc: ProcessResponse
-  all: ProcessResponse[]
   onOpen: (p: ProcessResponse) => void
 }) {
   const n = now()
-  const related = all
-    .filter((p) => p.name === proc.name && p.id !== proc.id)
-    .sort((a, b) => b.started_at - a.started_at)
+  // One bounded request for this name's newest runs instead of scanning a
+  // client-side copy of the whole table
+  const { data } = useProcessList({ name: proc.name, sort_by: 'started_at:desc', limit: 7 })
+  const related = (data?.data ?? [])
+    .filter((p) => p.id !== proc.id)
     .slice(0, 6)
   if (!related.length) return <div className="tti-detail__empty">No other runs of this process.</div>
   return (
@@ -127,14 +127,13 @@ function RelatedRuns({
 // ---- Main component ----
 interface DetailPanelProps {
   proc: ProcessResponse
-  allProcesses: ProcessResponse[]
   onClose: () => void
   onComplete: (proc: ProcessResponse, status: 'COMPLETED' | 'FAILED') => void
   onOpenOther: (proc: ProcessResponse) => void
   onDelete?: (proc: ProcessResponse) => void
 }
 
-export function DetailPanel({ proc, allProcesses, onClose, onComplete, onOpenOther, onDelete }: DetailPanelProps) {
+export function DetailPanel({ proc, onClose, onComplete, onOpenOther, onDelete }: DetailPanelProps) {
   const [tab, setTab] = useState<'timeline' | 'context' | 'tags' | 'related'>('timeline')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [, forceUpdate] = useState(0)
@@ -323,7 +322,7 @@ export function DetailPanel({ proc, allProcesses, onClose, onComplete, onOpenOth
           )}
           {tab === 'related' && (
             <div className="tti-detail__section">
-              <RelatedRuns proc={proc} all={allProcesses} onOpen={onOpenOther} />
+              <RelatedRuns proc={proc} onOpen={onOpenOther} />
             </div>
           )}
         </div>

@@ -2,6 +2,7 @@ package com.totrackit.task;
 
 import com.totrackit.entity.ProcessEntity;
 import com.totrackit.repository.ProcessRepository;
+import com.totrackit.service.AdvisoryLockService;
 import com.totrackit.service.MetricsService;
 import com.totrackit.service.WebhookNotificationService;
 import io.micronaut.context.annotation.Value;
@@ -13,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -29,28 +31,44 @@ import java.util.List;
  *
  * The scanner always runs; webhook delivery is optional. When a webhook is
  * configured, a process is only marked processed after successful delivery,
- * so failed deliveries are retried on the next scan.
+ * so failed deliveries are retried on the next scan. Each pass is bounded by
+ * totrackit.notification-batch-size and aborts early after consecutive
+ * delivery failures, so one slow or dead webhook endpoint cannot pin a scan
+ * cycle to the size of the backlog. A cluster-wide advisory lock ensures at
+ * most one replica scans at a time (webhooks would otherwise double-fire).
  */
 @Singleton
 public class DeadlineNotificationTask {
 
     private static final Logger LOG = LoggerFactory.getLogger(DeadlineNotificationTask.class);
 
+    /** Cluster-wide advisory lock key for the deadline scan ("TOTRACKI"). */
+    private static final long SCAN_LOCK_KEY = 0x544F545241434B49L;
+
+    /** Abort the current pass after this many consecutive failed deliveries. */
+    private static final int MAX_CONSECUTIVE_DELIVERY_FAILURES = 5;
+
     private final ProcessRepository processRepository;
     private final MetricsService metricsService;
+    private final AdvisoryLockService advisoryLockService;
     @Nullable
     private final WebhookNotificationService notificationService;
     private final double warningThreshold;
+    private final int batchSize;
 
     @Inject
     public DeadlineNotificationTask(ProcessRepository processRepository,
                                     MetricsService metricsService,
+                                    AdvisoryLockService advisoryLockService,
                                     @Nullable WebhookNotificationService notificationService,
-                                    @Value("${totrackit.warning-threshold:0.75}") double warningThreshold) {
+                                    @Value("${totrackit.warning-threshold:0.75}") double warningThreshold,
+                                    @Value("${totrackit.notification-batch-size:500}") int batchSize) {
         this.processRepository = processRepository;
         this.metricsService = metricsService;
+        this.advisoryLockService = advisoryLockService;
         this.notificationService = notificationService;
         this.warningThreshold = warningThreshold;
+        this.batchSize = batchSize;
     }
 
     /**
@@ -61,25 +79,42 @@ public class DeadlineNotificationTask {
     public void notifyMissedDeadlines() {
         boolean webhookActive = notificationService != null && notificationService.isEnabled();
         try {
-            warnApproachingDeadlines(webhookActive);
-            processMissedDeadlines(webhookActive);
+            boolean ran = advisoryLockService.runExclusive(SCAN_LOCK_KEY, () -> {
+                warnApproachingDeadlines(webhookActive);
+                processMissedDeadlines(webhookActive);
+                updateBacklogGauges();
+            });
+            if (!ran) {
+                LOG.debug("Deadline scan lock held by another replica; skipping this cycle");
+            }
         } catch (Exception e) {
             LOG.warn("Deadline notification scan failed", e);
         }
     }
 
     private void processMissedDeadlines(boolean webhookActive) {
-        List<ProcessEntity> overdue = processRepository.findOverdueUnnotified(Instant.now());
+        List<ProcessEntity> overdue = processRepository.findOverdueUnnotified(Instant.now(), batchSize);
         if (overdue.isEmpty()) {
             return;
         }
-        LOG.debug("Found {} overdue processes awaiting deadline processing", overdue.size());
+        LOG.debug("Processing {} overdue processes awaiting deadline events", overdue.size());
+        List<Long> processedIds = new ArrayList<>();
+        int consecutiveFailures = 0;
         for (ProcessEntity process : overdue) {
             if (webhookActive && !notificationService.sendDeadlineMissed(process)) {
+                if (++consecutiveFailures >= MAX_CONSECUTIVE_DELIVERY_FAILURES) {
+                    LOG.warn("Aborting missed-deadline pass after {} consecutive delivery failures; "
+                            + "remaining rows retry next scan", consecutiveFailures);
+                    break;
+                }
                 continue; // delivery failed; retried on the next scan
             }
-            processRepository.markDeadlineNotified(process.getId(), Instant.now());
+            consecutiveFailures = 0;
+            processedIds.add(process.getId());
             metricsService.recordDeadlineMissed(process.getName());
+        }
+        if (!processedIds.isEmpty()) {
+            processRepository.markDeadlineNotifiedBatch(processedIds, Instant.now());
         }
     }
 
@@ -88,28 +123,41 @@ public class DeadlineNotificationTask {
             return;
         }
         Instant now = Instant.now();
-        for (ProcessEntity process : processRepository.findApproachingUnwarned(now)) {
-            if (!hasCrossedWarningThreshold(process, now)) {
-                continue;
-            }
+        List<ProcessEntity> approaching = processRepository.findApproachingUnwarned(now, warningThreshold, batchSize);
+        if (approaching.isEmpty()) {
+            return;
+        }
+        List<Long> processedIds = new ArrayList<>();
+        int consecutiveFailures = 0;
+        for (ProcessEntity process : approaching) {
             long secondsRemaining = process.getDeadline().getEpochSecond() - now.getEpochSecond();
             if (webhookActive && !notificationService.sendDeadlineWarning(process, secondsRemaining)) {
+                if (++consecutiveFailures >= MAX_CONSECUTIVE_DELIVERY_FAILURES) {
+                    LOG.warn("Aborting deadline-warning pass after {} consecutive delivery failures; "
+                            + "remaining rows retry next scan", consecutiveFailures);
+                    break;
+                }
                 continue; // delivery failed; retried on the next scan
             }
-            processRepository.markDeadlineWarned(process.getId(), now);
+            consecutiveFailures = 0;
+            processedIds.add(process.getId());
             metricsService.recordDeadlineWarning(process.getName());
+        }
+        if (!processedIds.isEmpty()) {
+            processRepository.markDeadlineWarnedBatch(processedIds, now);
         }
     }
 
-    private boolean hasCrossedWarningThreshold(ProcessEntity process, Instant now) {
-        if (process.getStartedAt() == null || process.getDeadline() == null) {
-            return false;
-        }
-        long budget = process.getDeadline().getEpochSecond() - process.getStartedAt().getEpochSecond();
-        if (budget <= 0) {
-            return false;
-        }
-        long elapsed = now.getEpochSecond() - process.getStartedAt().getEpochSecond();
-        return (double) elapsed / budget >= warningThreshold;
+    /**
+     * Publishes how many deadline events are still unprocessed, so operators
+     * can alert on a webhook endpoint that keeps failing.
+     */
+    private void updateBacklogGauges() {
+        Instant now = Instant.now();
+        long missedBacklog = processRepository.countOverdueUnnotified(now);
+        long warningBacklog = (warningThreshold > 0 && warningThreshold < 1)
+                ? processRepository.countApproachingUnwarned(now, warningThreshold)
+                : 0;
+        metricsService.updateNotificationBacklog(missedBacklog, warningBacklog);
     }
 }
